@@ -1,0 +1,151 @@
+
+/* Import print styles */
+@import './styles/print.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    /* Zambia theme colors: Green (primary), Red (secondary), Orange (accent) */
+    /* Green: #198a00 -> hsl(113, 100%, 27%) */
+    --primary: 113 100% 27%;
+    --primary-foreground: 0 0% 98%;
+
+    /* Red: #de2010 -> hsl(4, 86%, 47%) */
+    --secondary: 4 86% 47%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 113 25% 95%;
+    --muted-foreground: 0 0% 20%;
+
+    /* Orange: #ef7d00 -> hsl(31, 100%, 47%) */
+    --accent: 31 100% 47%;
+    --accent-foreground: 0 0% 0%;
+
+    /* Red for destructive */
+    --destructive: 4 86% 47%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 113 22% 88%;
+    --input: 113 22% 88%;
+    --ring: 113 100% 27%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar using Zambia colors */
+    --sidebar-background: 113 30% 98%;
+    --sidebar-foreground: 0 0% 0%;
+    --sidebar-primary: 113 100% 27%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 31 100% 95%;
+    --sidebar-accent-foreground: 0 0% 0%;
+    --sidebar-border: 113 22% 88%;
+    --sidebar-ring: 113 100% 27%;
+  }
+
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Zambia theme for dark mode */
+    --primary: 113 75% 40%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 4 82% 54%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 113 20% 12%;
+    --muted-foreground: 0 0% 63.9%;
+
+    --accent: 31 100% 45%;
+    --accent-foreground: 0 0% 98%;
+
+    /* Red for dark mode destructive */
+    --destructive: 4 82% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 113 75% 40%;
+
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 113 75% 36%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 31 100% 45%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 10%;
+    --sidebar-ring: 113 75% 36%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom (legacy) theme utilities repurposed for Zambia colors */
+@layer utilities {
+  .bg-purple-primary {
+    background-color: hsl(113 100% 27%);
+  }
+  
+  .bg-purple-light {
+    background-color: hsl(113 25% 95%);
+  }
+  
+  .bg-purple-dark {
+    background-color: hsl(113 100% 22%);
+  }
+  
+  .text-purple-primary {
+    color: hsl(113 100% 27%);
+  }
+  
+  .text-purple-light {
+    color: hsl(113 25% 95%);
+  }
+  
+  .text-purple-dark {
+    color: hsl(113 100% 22%);
+  }
+  
+  .border-purple-primary {
+    border-color: hsl(113 100% 27%);
+  }
+  
+  .border-purple-light {
+    border-color: hsl(113 25% 90%);
+  }
+  
+  .border-purple-dark {
+    border-color: hsl(113 100% 22%);
+  }
+  
+  /* Interactive Animations */
+  .hover-scale {
+    @apply transition-transform duration-200 hover:scale-105;
+  }
+}
