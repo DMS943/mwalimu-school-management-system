@@ -43,6 +43,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/parent-signup" element={<ParentSignup />} />
           
           {/* Teacher Routes */}
