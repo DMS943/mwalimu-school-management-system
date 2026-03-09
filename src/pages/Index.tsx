@@ -109,6 +109,7 @@ const Index = () => {
 
   // If logged in, show role-based dashboard
   if (user) {
+    console.log('Logged in user:', user);
     const role = user.role.toLowerCase();
     
     if (role === 'admin') {

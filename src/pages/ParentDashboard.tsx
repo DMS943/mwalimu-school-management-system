@@ -47,17 +47,28 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
     try {
       setLoading(true);
       const response = await studentsApi.getStudents();
+      console.log('All students:', response);
+      console.log('Current user ID:', user.id);
+      
       // Filter students linked to this parent
-      const myChildren = response.filter((student: any) => student.parent_user === user.id);
+      // The parent_user field contains the user ID
+      const myChildren = response.filter((student: any) => {
+        console.log(`Student ${student.first_name} ${student.last_name} - parent_user:`, student.parent_user);
+        return student.parent_user === user.id;
+      });
+      
+      console.log('My children:', myChildren);
       setChildren(myChildren);
+      
       if (myChildren.length > 0) {
         setSelectedChild(myChildren[0]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching children:', error);
+      console.error('Error response:', error.response?.data);
       toast({
         title: 'Error',
-        description: 'Failed to load student information',
+        description: error.response?.data?.detail || 'Failed to load student information',
         variant: 'destructive',
       });
     } finally {
