@@ -47,12 +47,16 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
     try {
       setLoading(true);
       const response = await studentsApi.getStudents();
-      console.log('All students:', response);
+      console.log('API response:', response);
       console.log('Current user ID:', user.id);
+      
+      // Handle paginated response - the actual data is in response.results
+      const students = response.results || response;
+      console.log('Students array:', students);
       
       // Filter students linked to this parent
       // The parent_user field contains the user ID
-      const myChildren = response.filter((student: any) => {
+      const myChildren = students.filter((student: any) => {
         console.log(`Student ${student.first_name} ${student.last_name} - parent_user:`, student.parent_user);
         return student.parent_user === user.id;
       });
