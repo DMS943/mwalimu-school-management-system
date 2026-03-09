@@ -1,0 +1,145 @@
+stages:
+  - test
+  - build
+  - deploy
+
+variables:
+  POSTGRES_DB: school_management_test
+  POSTGRES_USER: school_admin
+  POSTGRES_PASSWORD: test_password
+  DATABASE_URL: postgresql://school_admin:test_password@postgres:5432/school_management_test
+
+# Backend Testing
+backend-test:
+  stage: test
+  image: python:3.10
+  services:
+    - postgres:15
+  variables:
+    POSTGRES_DB: $POSTGRES_DB
+    POSTGRES_USER: $POSTGRES_USER
+    POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+  before_script:
+    - cd backend
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+  script:
+    - python manage.py check
+    - python manage.py makemigrations --check --dry-run
+    - python manage.py test
+  only:
+    - main
+    - merge_requests
+  cache:
+    paths:
+      - backend/.pip-cache/
+
+# Frontend Testing
+frontend-test:
+  stage: test
+  image: node:18
+  before_script:
+    - npm ci
+  script:
+    - npm run lint || true
+    - npm run build
+  only:
+    - main
+    - merge_requests
+  cache:
+    paths:
+      - node_modules/
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 hour
+
+# Backend Build
+backend-build:
+  stage: build
+  image: python:3.10
+  before_script:
+    - cd backend
+    - pip install --upgrade pip
+    - pip install -r requirements-prod.txt
+  script:
+    - python manage.py collectstatic --noinput
+    - echo "Backend build completed"
+  only:
+    - main
+  artifacts:
+    paths:
+      - backend/staticfiles/
+    expire_in: 1 hour
+
+# Frontend Build
+frontend-build:
+  stage: build
+  image: node:18
+  before_script:
+    - npm ci
+  script:
+    - npm run build
+    - echo "Frontend build completed"
+  only:
+    - main
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 hour
+
+# Deploy to Staging
+deploy-staging:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $STAGING_SERVER >> ~/.ssh/known_hosts
+  script:
+    - echo "Deploying to staging server..."
+    - ssh $STAGING_USER@$STAGING_SERVER "cd $STAGING_PATH && git pull origin main"
+    - ssh $STAGING_USER@$STAGING_SERVER "cd $STAGING_PATH/backend && source venv/bin/activate && pip install -r requirements.txt"
+    - ssh $STAGING_USER@$STAGING_SERVER "cd $STAGING_PATH/backend && source venv/bin/activate && python manage.py migrate"
+    - ssh $STAGING_USER@$STAGING_SERVER "cd $STAGING_PATH/backend && source venv/bin/activate && python manage.py collectstatic --noinput"
+    - ssh $STAGING_USER@$STAGING_SERVER "cd $STAGING_PATH && npm install && npm run build"
+    - ssh $STAGING_USER@$STAGING_SERVER "sudo systemctl restart school-backend"
+    - ssh $STAGING_USER@$STAGING_SERVER "sudo systemctl restart nginx"
+    - echo "Staging deployment completed"
+  environment:
+    name: staging
+    url: https://staging.yourschool.com
+  only:
+    - main
+  when: manual
+
+# Deploy to Production
+deploy-production:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $PRODUCTION_SERVER >> ~/.ssh/known_hosts
+  script:
+    - echo "Deploying to production server..."
+    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "cd $PRODUCTION_PATH && git pull origin main"
+    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "cd $PRODUCTION_PATH/backend && source venv/bin/activate && pip install -r requirements-prod.txt"
+    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "cd $PRODUCTION_PATH/backend && source venv/bin/activate && python manage.py migrate"
+    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "cd $PRODUCTION_PATH/backend && source venv/bin/activate && python manage.py collectstatic --noinput"
+    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "cd $PRODUCTION_PATH && npm install && npm run build"
+    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "sudo systemctl restart school-backend"
+    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "sudo systemctl restart nginx"
+    - echo "Production deployment completed"
+  environment:
+    name: production
+    url: https://yourschool.com
+  only:
+    - main
+  when: manual

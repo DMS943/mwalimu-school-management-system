@@ -13,6 +13,7 @@ import TeacherGrades from "./pages/teacher/Grades";
 import TeacherAttendance from "./pages/teacher/Attendance";
 import TeacherStudents from "./pages/teacher/Students";
 import TeacherReports from "./pages/teacher/Reports";
+import TeacherSchedule from "./pages/teacher/Schedule";
 
 // Admin pages
 import AdminUsers from "./pages/admin/Users";
@@ -48,6 +49,7 @@ const App = () => (
           <Route path="/teacher/attendance" element={<TeacherAttendance />} />
           <Route path="/teacher/students" element={<TeacherStudents />} />
           <Route path="/teacher/reports" element={<TeacherReports />} />
+          <Route path="/teacher/schedule" element={<TeacherSchedule />} />
           
           {/* Admin Routes */}
           <Route path="/admin/users" element={<AdminUsers />} />

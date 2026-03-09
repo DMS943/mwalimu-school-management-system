@@ -1,0 +1,29 @@
+[Unit]
+Description=School Management System Backend (Gunicorn)
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=notify
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/school-management/backend
+Environment="PATH=/var/www/school-management/backend/venv/bin"
+EnvironmentFile=/var/www/school-management/backend/.env
+ExecStart=/var/www/school-management/backend/venv/bin/gunicorn \
+          --workers 4 \
+          --bind unix:/var/www/school-management/backend/gunicorn.sock \
+          --timeout 120 \
+          --access-logfile /var/log/school-backend/access.log \
+          --error-logfile /var/log/school-backend/error.log \
+          --log-level info \
+          config.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

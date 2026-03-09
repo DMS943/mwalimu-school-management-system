@@ -208,7 +208,10 @@ const TeacherDashboard = ({ user, onLogout }: TeacherDashboardProps) => {
             </CardHeader>
           </Card>
 
-          <Card className="hover:shadow-lg transition cursor-pointer">
+          <Card 
+            className="hover:shadow-lg transition cursor-pointer"
+            onClick={() => navigate('/teacher/schedule')}
+          >
             <CardHeader>
               <CardTitle>Class Schedule</CardTitle>
               <CardDescription>View your teaching schedule</CardDescription>

@@ -101,4 +101,29 @@ export const schoolsApi = {
   deleteTerm: async (id: string) => {
     await apiClient.delete(`/schools/terms/${id}/`);
   },
+
+  // Schedules
+  getSchedules: async (params?: any) => {
+    const response = await apiClient.get('/schools/schedules/', { params });
+    return response.data;
+  },
+
+  getMySchedule: async () => {
+    const response = await apiClient.get('/schools/schedules/my_schedule/');
+    return response.data;
+  },
+
+  createSchedule: async (data: any) => {
+    const response = await apiClient.post('/schools/schedules/', data);
+    return response.data;
+  },
+
+  updateSchedule: async (id: string, data: any) => {
+    const response = await apiClient.put(`/schools/schedules/${id}/`, data);
+    return response.data;
+  },
+
+  deleteSchedule: async (id: string) => {
+    await apiClient.delete(`/schools/schedules/${id}/`);
+  },
 };
