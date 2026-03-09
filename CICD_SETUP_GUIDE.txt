@@ -1,0 +1,135 @@
+CI/CD PIPELINE SETUP GUIDE
+========================================
+
+Your CI/CD pipeline has been successfully pushed to GitLab!
+
+NEXT STEPS TO ACTIVATE THE PIPELINE:
+========================================
+
+1. CONFIGURE GITLAB CI/CD VARIABLES
+   Go to: GitLab Project > Settings > CI/CD > Variables
+   
+   Add these variables (mark as "Protected" and "Masked" where appropriate):
+
+   For Staging:
+   - SSH_PRIVATE_KEY: Your SSH private key for server access (masked)
+   - STAGING_SERVER: IP address or domain of staging server
+   - STAGING_USER: SSH username (e.g., deploy)
+   - STAGING_PATH: Path on server (e.g., /var/www/school-management-staging)
+
+   For Production:
+   - PRODUCTION_SERVER: IP address or domain of production server
+   - PRODUCTION_USER: SSH username (e.g., deploy)
+   - PRODUCTION_PATH: Path on server (e.g., /var/www/school-management)
+
+2. PREPARE YOUR SERVERS
+   
+   On each server (staging and production), run:
+   
+   a) Copy the setup script to your server:
+      scp deployment/setup-server.sh user@server:/tmp/
+   
+   b) SSH into the server and run:
+      chmod +x /tmp/setup-server.sh
+      sudo /tmp/setup-server.sh
+   
+   c) Update the .env file with your actual values:
+      nano /var/www/school-management/backend/.env
+   
+   d) Update Nginx configuration with your domain:
+      sudo nano /etc/nginx/sites-available/school-management
+
+3. SETUP SSH ACCESS
+   
+   Generate SSH key pair if you don't have one:
+   ssh-keygen -t ed25519 -C "gitlab-ci"
+   
+   Add the public key to your servers:
+   ssh-copy-id deploy@your-server-ip
+   
+   Copy the private key content and add it to GitLab CI/CD variables as SSH_PRIVATE_KEY
+
+4. TEST THE PIPELINE
+   
+   The pipeline will automatically run on:
+   - Push to main branch (test and build stages)
+   - Merge requests (test stage only)
+   
+   Deployment to staging/production requires manual trigger:
+   - Go to: CI/CD > Pipelines
+   - Click on the pipeline
+   - Click "Play" button on deploy-staging or deploy-production job
+
+5. OPTIONAL: SETUP SSL CERTIFICATE
+   
+   On your server, install certbot:
+   sudo apt install certbot python3-certbot-nginx
+   
+   Get SSL certificate:
+   sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+   
+   Certbot will automatically update your Nginx configuration
+
+========================================
+PIPELINE STAGES:
+========================================
+
+1. TEST STAGE (automatic)
+   - backend-test: Runs Django tests with PostgreSQL
+   - frontend-test: Lints and builds frontend
+
+2. BUILD STAGE (automatic on main branch)
+   - backend-build: Collects static files
+   - frontend-build: Builds production frontend
+
+3. DEPLOY STAGE (manual trigger)
+   - deploy-staging: Deploys to staging server
+   - deploy-production: Deploys to production server
+
+========================================
+USEFUL COMMANDS:
+========================================
+
+Check pipeline status:
+- View in GitLab: CI/CD > Pipelines
+
+On the server:
+- Check backend status: sudo systemctl status school-backend
+- Restart backend: sudo systemctl restart school-backend
+- View backend logs: sudo tail -f /var/log/school-backend/error.log
+- Check nginx status: sudo systemctl status nginx
+- Restart nginx: sudo systemctl restart nginx
+- View nginx logs: sudo tail -f /var/log/nginx/school-error.log
+
+========================================
+DOCKER DEPLOYMENT (ALTERNATIVE):
+========================================
+
+If you prefer Docker deployment:
+
+1. Install Docker and Docker Compose on your server
+2. Copy .env.example.production to .env and update values
+3. Run: docker-compose -f docker-compose.prod.yml up -d
+4. Run migrations: docker-compose -f docker-compose.prod.yml exec backend python manage.py migrate
+5. Create superuser: docker-compose -f docker-compose.prod.yml exec backend python manage.py createsuperuser
+
+========================================
+TROUBLESHOOTING:
+========================================
+
+Pipeline fails at test stage:
+- Check test logs in GitLab CI/CD > Pipelines > Job
+- Ensure all tests pass locally first
+
+Deployment fails:
+- Verify SSH access: ssh deploy@your-server-ip
+- Check server logs: sudo journalctl -u school-backend -n 50
+- Verify environment variables in .env file
+
+Application not accessible:
+- Check nginx status: sudo systemctl status nginx
+- Check backend status: sudo systemctl status school-backend
+- Verify firewall: sudo ufw status
+- Check DNS settings for your domain
+
+========================================
