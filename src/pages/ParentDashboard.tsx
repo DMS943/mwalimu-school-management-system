@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Users, Award, Calendar, FileText, BookOpen, TrendingUp, User, GraduationCap, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
-import { studentsAPI } from '@/api/students';
-import { academicsAPI } from '@/api/academics';
-import { reportsAPI } from '@/api/reports';
+import { studentsApi } from '@/api/students';
+import { academicsApi } from '@/api/academics';
+import { reportsApi } from '@/api/reports';
 import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
@@ -46,7 +46,7 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
   const fetchChildren = async () => {
     try {
       setLoading(true);
-      const response = await studentsAPI.getAll();
+      const response = await studentsApi.getStudents();
       // Filter students linked to this parent
       const myChildren = response.filter((student: any) => student.parent_user === user.id);
       setChildren(myChildren);
@@ -68,15 +68,15 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
   const fetchChildData = async (studentId: number) => {
     try {
       // Fetch grades
-      const gradesResponse = await academicsAPI.getMarks({ student: studentId });
+      const gradesResponse = await academicsApi.getMarks({ student: studentId });
       setGrades(gradesResponse);
 
       // Fetch attendance
-      const attendanceResponse = await studentsAPI.getAttendance({ student: studentId });
+      const attendanceResponse = await studentsApi.getAttendance({ student: studentId });
       setAttendance(attendanceResponse);
 
       // Fetch reports
-      const reportsResponse = await reportsAPI.getReports({ student: studentId });
+      const reportsResponse = await reportsApi.getReports({ student: studentId });
       setReports(reportsResponse);
     } catch (error) {
       console.error('Error fetching child data:', error);
