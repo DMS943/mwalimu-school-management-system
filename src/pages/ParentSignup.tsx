@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { authAPI } from "@/api/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, UserPlus, ArrowLeft } from "lucide-react";
+import { Loader2, UserPlus, ArrowLeft, Info } from "lucide-react";
 
 const ParentSignup = () => {
   const navigate = useNavigate();
@@ -21,7 +21,7 @@ const ParentSignup = () => {
     password: "",
     confirmPassword: "",
     full_name: "",
-    link_code: "",
+    student_identifier: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -37,7 +37,7 @@ const ParentSignup = () => {
     setError("");
 
     // Validation
-    if (!formData.username || !formData.email || !formData.password || !formData.full_name || !formData.link_code) {
+    if (!formData.username || !formData.email || !formData.password || !formData.full_name || !formData.student_identifier) {
       setError("All fields are required");
       return;
     }
@@ -52,11 +52,6 @@ const ParentSignup = () => {
       return;
     }
 
-    if (formData.link_code.length !== 8) {
-      setError("Link code must be 8 characters");
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -65,7 +60,7 @@ const ParentSignup = () => {
         email: formData.email,
         password: formData.password,
         full_name: formData.full_name,
-        link_code: formData.link_code.toUpperCase(),
+        student_identifier: formData.student_identifier.trim(),
       });
 
       // Store tokens and user data
@@ -184,22 +179,23 @@ const ParentSignup = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="link_code">Student Link Code</Label>
+              <Label htmlFor="student_identifier">Student ID or Full Name</Label>
               <Input
-                id="link_code"
-                name="link_code"
+                id="student_identifier"
+                name="student_identifier"
                 type="text"
-                placeholder="ABC12345"
-                value={formData.link_code}
+                placeholder="123 or John Smith"
+                value={formData.student_identifier}
                 onChange={handleChange}
                 disabled={loading}
-                maxLength={8}
-                className="uppercase"
                 required
               />
-              <p className="text-xs text-muted-foreground">
-                Enter the 8-character code provided by the school
-              </p>
+              <div className="flex items-start gap-2 p-2 bg-blue-50 rounded-md">
+                <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-blue-700">
+                  Enter your child's student ID number or their full name (e.g., "John Smith")
+                </p>
+              </div>
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>

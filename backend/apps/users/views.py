@@ -59,18 +59,18 @@ def login_view(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def parent_signup_view(request):
-    """Parent signup view that validates link code and creates parent account"""
-    from apps.students.models import StudentLinkCode
-    from django.utils import timezone
+    """Parent signup view that links parent to student using student ID or full name"""
+    from apps.students.models import Student
+    from django.db.models import Q
     
     username = request.data.get('username')
     email = request.data.get('email')
     password = request.data.get('password')
     full_name = request.data.get('full_name')
-    link_code = request.data.get('link_code')
+    student_identifier = request.data.get('student_identifier')  # Can be ID or full name
     
     # Validate required fields
-    if not all([username, email, password, full_name, link_code]):
+    if not all([username, email, password, full_name, student_identifier]):
         return Response(
             {'detail': 'All fields are required'},
             status=status.HTTP_400_BAD_REQUEST
@@ -90,30 +90,60 @@ def parent_signup_view(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Validate link code
-    try:
-        link_code_obj = StudentLinkCode.objects.get(
-            link_code=link_code.upper(),
+    # Find student by ID or full name
+    student = None
+    
+    # Try to find by ID first (if it's numeric)
+    if student_identifier.isdigit():
+        try:
+            student = Student.objects.get(id=int(student_identifier), is_active=True)
+        except Student.DoesNotExist:
+            pass
+    
+    # If not found by ID, try by full name (case-insensitive)
+    if not student:
+        # Try exact match first
+        students = Student.objects.filter(
+            Q(first_name__iexact=student_identifier.split()[0]) if ' ' in student_identifier else Q(),
             is_active=True
         )
         
-        # Check if code has expired
-        if link_code_obj.expires_at < timezone.now():
-            return Response(
-                {'detail': 'Link code has expired'},
-                status=status.HTTP_400_BAD_REQUEST
+        # Try full name match
+        if ' ' in student_identifier:
+            name_parts = student_identifier.strip().split()
+            first_name = name_parts[0]
+            last_name = ' '.join(name_parts[1:])
+            
+            students = Student.objects.filter(
+                Q(first_name__iexact=first_name, last_name__iexact=last_name) |
+                Q(first_name__icontains=first_name, last_name__icontains=last_name),
+                is_active=True
+            )
+        else:
+            # Single name - search in both first and last name
+            students = Student.objects.filter(
+                Q(first_name__iexact=student_identifier) | Q(last_name__iexact=student_identifier),
+                is_active=True
             )
         
-        # Check if code has already been used
-        if link_code_obj.used_by:
+        if students.count() == 1:
+            student = students.first()
+        elif students.count() > 1:
             return Response(
-                {'detail': 'Link code has already been used'},
+                {'detail': 'Multiple students found with that name. Please use the student ID instead.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-    except StudentLinkCode.DoesNotExist:
+    
+    if not student:
         return Response(
-            {'detail': 'Invalid link code'},
+            {'detail': 'Student not found. Please check the student ID or full name.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Check if student already has a parent linked
+    if student.parent_user:
+        return Response(
+            {'detail': 'This student already has a parent account linked.'},
             status=status.HTTP_400_BAD_REQUEST
         )
     
@@ -127,15 +157,8 @@ def parent_signup_view(request):
     )
     
     # Link student to parent
-    student = link_code_obj.student
     student.parent_user = user
     student.save()
-    
-    # Mark link code as used
-    link_code_obj.used_by = user
-    link_code_obj.used_at = timezone.now()
-    link_code_obj.is_active = False
-    link_code_obj.save()
     
     # Generate tokens
     refresh = RefreshToken.for_user(user)

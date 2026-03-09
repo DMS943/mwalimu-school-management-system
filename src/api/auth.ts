@@ -23,7 +23,7 @@ export interface ParentSignupData {
   email: string;
   password: string;
   full_name: string;
-  link_code: string;
+  student_identifier: string;  // Can be student ID or full name
 }
 
 export interface ParentSignupResponse extends LoginResponse {
