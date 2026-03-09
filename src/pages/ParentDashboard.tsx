@@ -84,28 +84,34 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
     try {
       // Fetch grades
       const gradesResponse = await academicsApi.getMarks({ student: studentId });
-      setGrades(gradesResponse);
+      const gradesData = gradesResponse.results || gradesResponse;
+      setGrades(Array.isArray(gradesData) ? gradesData : []);
 
       // Fetch attendance
       const attendanceResponse = await studentsApi.getAttendance({ student: studentId });
-      setAttendance(attendanceResponse);
+      const attendanceData = attendanceResponse.results || attendanceResponse;
+      setAttendance(Array.isArray(attendanceData) ? attendanceData : []);
 
       // Fetch reports
       const reportsResponse = await reportsApi.getReports({ student: studentId });
-      setReports(reportsResponse);
+      const reportsData = reportsResponse.results || reportsResponse;
+      setReports(Array.isArray(reportsData) ? reportsData : []);
     } catch (error) {
       console.error('Error fetching child data:', error);
     }
   };
 
   const calculateAverageGrade = () => {
-    if (grades.length === 0) return 'N/A';
+    if (!grades || grades.length === 0) return 'N/A';
     const total = grades.reduce((sum, grade) => sum + (grade.total_marks || 0), 0);
     const avg = total / grades.length;
     return avg.toFixed(1);
   };
 
   const getAttendanceStats = () => {
+    if (!attendance || attendance.length === 0) {
+      return { total: 0, present: 0, absent: 0, late: 0, percentage: '0' };
+    }
     const total = attendance.length;
     const present = attendance.filter(a => a.status === 'present').length;
     const absent = attendance.filter(a => a.status === 'absent').length;
