@@ -12,6 +12,7 @@ import TeacherClasses from "./pages/teacher/Classes";
 import TeacherGrades from "./pages/teacher/Grades";
 import TeacherAttendance from "./pages/teacher/Attendance";
 import TeacherStudents from "./pages/teacher/Students";
+import TeacherReports from "./pages/teacher/Reports";
 
 // Admin pages
 import AdminUsers from "./pages/admin/Users";
@@ -46,6 +47,7 @@ const App = () => (
           <Route path="/teacher/grades" element={<TeacherGrades />} />
           <Route path="/teacher/attendance" element={<TeacherAttendance />} />
           <Route path="/teacher/students" element={<TeacherStudents />} />
+          <Route path="/teacher/reports" element={<TeacherReports />} />
           
           {/* Admin Routes */}
           <Route path="/admin/users" element={<AdminUsers />} />

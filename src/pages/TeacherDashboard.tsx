@@ -198,10 +198,13 @@ const TeacherDashboard = ({ user, onLogout }: TeacherDashboardProps) => {
             </CardHeader>
           </Card>
 
-          <Card className="hover:shadow-lg transition cursor-pointer">
+          <Card 
+            className="hover:shadow-lg transition cursor-pointer"
+            onClick={() => navigate('/teacher/reports')}
+          >
             <CardHeader>
               <CardTitle>Generate Reports</CardTitle>
-              <CardDescription>Create student progress reports</CardDescription>
+              <CardDescription>Create and preview student report cards</CardDescription>
             </CardHeader>
           </Card>
 
