@@ -95,3 +95,34 @@ class Term(models.Model):
         if self.is_active:
             Term.objects.filter(is_active=True).update(is_active=False)
         super().save(*args, **kwargs)
+
+
+class Schedule(models.Model):
+    DAYS_OF_WEEK = [
+        ('monday', 'Monday'),
+        ('tuesday', 'Tuesday'),
+        ('wednesday', 'Wednesday'),
+        ('thursday', 'Thursday'),
+        ('friday', 'Friday'),
+        ('saturday', 'Saturday'),
+        ('sunday', 'Sunday'),
+    ]
+    
+    class_assigned = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='schedules')
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
+    teacher = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='teaching_schedules')
+    day_of_week = models.CharField(max_length=10, choices=DAYS_OF_WEEK)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    room = models.CharField(max_length=50, null=True, blank=True)
+    term = models.ForeignKey(Term, on_delete=models.CASCADE, related_name='schedules', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'schedules'
+        ordering = ['day_of_week', 'start_time']
+        unique_together = ['class_assigned', 'day_of_week', 'start_time', 'term']
+        
+    def __str__(self):
+        return f"{self.class_assigned} - {self.subject} - {self.day_of_week} {self.start_time}"
