@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import ParentSignup from "./pages/ParentSignup";
 
 // Teacher pages
 import TeacherClasses from "./pages/teacher/Classes";
@@ -42,6 +43,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/parent-signup" element={<ParentSignup />} />
           
           {/* Teacher Routes */}
           <Route path="/teacher/classes" element={<TeacherClasses />} />

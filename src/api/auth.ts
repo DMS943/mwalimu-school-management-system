@@ -18,9 +18,30 @@ export interface LoginResponse {
   };
 }
 
+export interface ParentSignupData {
+  username: string;
+  email: string;
+  password: string;
+  full_name: string;
+  link_code: string;
+}
+
+export interface ParentSignupResponse extends LoginResponse {
+  student: {
+    id: number;
+    full_name: string;
+    student_number: string;
+  };
+}
+
 export const authAPI = {
   login: async (username: string, password: string): Promise<LoginResponse> => {
     const response = await apiClient.post('/users/login/', { username, password });
+    return response.data;
+  },
+
+  parentSignup: async (data: ParentSignupData): Promise<ParentSignupResponse> => {
+    const response = await apiClient.post('/users/parent-signup/', data);
     return response.data;
   },
 

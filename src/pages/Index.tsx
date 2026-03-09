@@ -189,6 +189,15 @@ const Index = () => {
             </Button>
           </form>
 
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-600">
+              Are you a parent?{' '}
+              <a href="/parent-signup" className="text-blue-600 hover:text-blue-800 font-semibold">
+                Create an account
+              </a>
+            </p>
+          </div>
+
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-800 font-semibold mb-2">First time setup:</p>
             <ol className="text-sm text-blue-700 list-decimal list-inside space-y-1">
