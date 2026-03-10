@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, Award, Calendar, FileText, BookOpen, TrendingUp, User, GraduationCap, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Users, Award, Calendar, FileText, BookOpen, TrendingUp, User, GraduationCap, CheckCircle, XCircle, Clock, AlertCircle, Download, Eye } from 'lucide-react';
 import { studentsApi } from '@/api/students';
 import { academicsApi } from '@/api/academics';
 import { reportsApi } from '@/api/reports';
@@ -32,6 +33,8 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
   const [grades, setGrades] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
+  const [previewReport, setPreviewReport] = useState<any>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     fetchChildren();
@@ -134,6 +137,87 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
       case 'late': return <Clock className="h-4 w-4 text-yellow-600" />;
       case 'excused': return <AlertCircle className="h-4 w-4 text-blue-600" />;
       default: return null;
+    }
+  };
+
+  const handlePreviewReport = async (reportId: number) => {
+    try {
+      const report = await reportsApi.previewReport(reportId.toString());
+      setPreviewReport(report);
+      setShowPreview(true);
+    } catch (error: any) {
+      console.error('Error previewing report:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load report preview',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDownloadReport = () => {
+    if (!previewReport) return;
+    
+    // Create a printable version
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Report Card - ${previewReport.student?.first_name || 'Student'} ${previewReport.student?.last_name || ''}</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              .header { text-align: center; margin-bottom: 30px; }
+              .info { margin-bottom: 20px; }
+              table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f2f2f2; }
+              .summary { margin-top: 20px; }
+              @media print {
+                button { display: none; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Academic Report Card</h1>
+              <h3>${previewReport.term?.name || 'Term'}</h3>
+            </div>
+            <div class="info">
+              <p><strong>Student:</strong> ${previewReport.student?.first_name || ''} ${previewReport.student?.last_name || ''}</p>
+              <p><strong>Student Number:</strong> ${previewReport.student?.student_number || 'N/A'}</p>
+              <p><strong>Class:</strong> ${previewReport.class_assigned?.name || 'N/A'}</p>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Marks</th>
+                  <th>Grade</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${previewReport.marks?.map((mark: any) => `
+                  <tr>
+                    <td>${mark.subject?.name || mark.subject_name || 'N/A'}</td>
+                    <td>${mark.total_marks || 0}%</td>
+                    <td>${mark.grade || 'N/A'}</td>
+                  </tr>
+                `).join('') || '<tr><td colspan="3">No marks available</td></tr>'}
+              </tbody>
+            </table>
+            <div class="summary">
+              <p><strong>Total Marks:</strong> ${previewReport.total_marks || 0}</p>
+              <p><strong>Average:</strong> ${previewReport.average || 0}%</p>
+              <p><strong>Grade:</strong> ${previewReport.grade || 'N/A'}</p>
+              <p><strong>Class Position:</strong> ${previewReport.class_position || 'N/A'}</p>
+              ${previewReport.teacher_comment ? `<p><strong>Teacher's Comment:</strong> ${previewReport.teacher_comment}</p>` : ''}
+            </div>
+            <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; background: #4CAF50; color: white; border: none; cursor: pointer;">Print / Download PDF</button>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
     }
   };
 
@@ -357,7 +441,7 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
             <Card>
               <CardHeader>
                 <CardTitle>Report Cards</CardTitle>
-                <CardDescription>Download and view academic reports</CardDescription>
+                <CardDescription>View and download academic reports</CardDescription>
               </CardHeader>
               <CardContent>
                 {reports.length === 0 ? (
@@ -365,7 +449,7 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
                 ) : (
                   <div className="space-y-3">
                     {reports.map((report) => (
-                      <div key={report.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div key={report.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
                         <div className="flex items-center gap-3">
                           <FileText className="h-5 w-5 text-purple-600" />
                           <div>
@@ -373,9 +457,26 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
                             <p className="text-sm text-gray-600">
                               Average: {report.average}% | Grade: {report.grade} | Position: {report.class_position}
                             </p>
+                            {report.teacher_comment && (
+                              <p className="text-sm text-gray-500 mt-1">Comment: {report.teacher_comment}</p>
+                            )}
                           </div>
                         </div>
-                        <Button size="sm" variant="outline">Download</Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handlePreviewReport(report.id)}
+                          >
+                            Preview
+                          </Button>
+                          <Button 
+                            size="sm"
+                            onClick={() => handleDownloadReport(report.id)}
+                          >
+                            Download
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -385,6 +486,77 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Report Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Report Card Preview</DialogTitle>
+            <DialogDescription>
+              {previewReport?.term?.name || 'Academic Report'}
+            </DialogDescription>
+          </DialogHeader>
+          {previewReport && (
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-2">Student Information</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <p><span className="font-medium">Name:</span> {previewReport.student?.first_name} {previewReport.student?.last_name}</p>
+                  <p><span className="font-medium">Student Number:</span> {previewReport.student?.student_number}</p>
+                  <p><span className="font-medium">Class:</span> {previewReport.class_assigned?.name || 'N/A'}</p>
+                  <p><span className="font-medium">Term:</span> {previewReport.term?.name}</p>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-semibold mb-2">Subject Grades</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Subject</TableHead>
+                      <TableHead className="text-right">Marks</TableHead>
+                      <TableHead className="text-right">Grade</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewReport.marks?.map((mark: any, index: number) => (
+                      <TableRow key={index}>
+                        <TableCell>{mark.subject?.name || mark.subject_name || 'N/A'}</TableCell>
+                        <TableCell className="text-right">{mark.total_marks || 0}%</TableCell>
+                        <TableCell className="text-right font-bold">{mark.grade || 'N/A'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-2">Summary</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <p><span className="font-medium">Total Marks:</span> {previewReport.total_marks || 0}</p>
+                  <p><span className="font-medium">Average:</span> {previewReport.average || 0}%</p>
+                  <p><span className="font-medium">Grade:</span> {previewReport.grade || 'N/A'}</p>
+                  <p><span className="font-medium">Class Position:</span> {previewReport.class_position || 'N/A'}</p>
+                </div>
+                {previewReport.teacher_comment && (
+                  <div className="mt-3">
+                    <p className="font-medium">Teacher's Comment:</p>
+                    <p className="text-sm mt-1">{previewReport.teacher_comment}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowPreview(false)}>Close</Button>
+                <Button onClick={handleDownloadReport}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Print / Download PDF
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
