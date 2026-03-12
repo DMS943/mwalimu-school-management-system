@@ -154,6 +154,54 @@ INSERT INTO students (student_number, first_name, last_name, date_of_birth, gend
 ON CONFLICT (student_number) DO NOTHING;
 
 -- ============================================
+-- 7. SAMPLE MARKS FOR TESTING
+-- ============================================
+-- Marks for Mwansa Chanda (student_id: 1) in Term 1
+INSERT INTO marks (student_id, subject_id, term_id, marks, grade, created_at, updated_at) VALUES
+-- Mwansa Chanda's marks
+(1, 1, 1, 85, 'A', NOW(), NOW()),  -- Mathematics
+(1, 2, 1, 78, 'B+', NOW(), NOW()), -- English
+(1, 3, 1, 82, 'A-', NOW(), NOW()), -- Science
+(1, 4, 1, 75, 'B', NOW(), NOW()),  -- Social Studies
+(1, 5, 1, 88, 'A', NOW(), NOW()),  -- Computer Studies
+
+-- Chipo Banda's marks
+(2, 1, 1, 92, 'A+', NOW(), NOW()), -- Mathematics
+(2, 2, 1, 89, 'A', NOW(), NOW()),  -- English
+(2, 3, 1, 91, 'A+', NOW(), NOW()), -- Science
+(2, 4, 1, 87, 'A', NOW(), NOW()),  -- Social Studies
+(2, 5, 1, 85, 'A', NOW(), NOW())   -- Computer Studies
+ON CONFLICT DO NOTHING;
+
+-- ============================================
+-- 8. SAMPLE REPORTS FOR TESTING
+-- ============================================
+-- Generate reports for the students
+INSERT INTO reports (student_id, term_id, total_marks, average_percentage, overall_grade, position, class_size, teacher_comment, generated_at, updated_at) VALUES
+-- Mwansa Chanda's report
+(1, 1, 408, 81.6, 'A-', 2, 5, 'Excellent performance in Mathematics and Computer Studies. Keep up the good work!', NOW(), NOW()),
+-- Chipo Banda's report  
+(2, 1, 444, 88.8, 'A', 1, 5, 'Outstanding performance across all subjects. Well done!', NOW(), NOW())
+ON CONFLICT (student_id, term_id) DO NOTHING;
+
+-- ============================================
+-- 9. SAMPLE ATTENDANCE FOR TESTING
+-- ============================================
+-- Attendance records for Mwansa Chanda
+INSERT INTO attendance (student_id, date, status, notes, created_at, updated_at) VALUES
+(1, CURRENT_DATE - INTERVAL '10 days', 'present', NULL, NOW(), NOW()),
+(1, CURRENT_DATE - INTERVAL '9 days', 'present', NULL, NOW(), NOW()),
+(1, CURRENT_DATE - INTERVAL '8 days', 'absent', 'Sick', NOW(), NOW()),
+(1, CURRENT_DATE - INTERVAL '7 days', 'present', NULL, NOW(), NOW()),
+(1, CURRENT_DATE - INTERVAL '6 days', 'late', 'Traffic', NOW(), NOW()),
+(1, CURRENT_DATE - INTERVAL '5 days', 'present', NULL, NOW(), NOW()),
+(1, CURRENT_DATE - INTERVAL '4 days', 'present', NULL, NOW(), NOW()),
+(1, CURRENT_DATE - INTERVAL '3 days', 'present', NULL, NOW(), NOW()),
+(1, CURRENT_DATE - INTERVAL '2 days', 'present', NULL, NOW(), NOW()),
+(1, CURRENT_DATE - INTERVAL '1 day', 'present', NULL, NOW(), NOW())
+ON CONFLICT DO NOTHING;
+
+-- ============================================
 -- SUCCESS MESSAGE
 -- ============================================
 DO $$

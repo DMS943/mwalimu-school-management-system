@@ -47,8 +47,12 @@ interface ReportPreview {
     end_date: string;
   };
   marks: Array<{
-    subject: string;
-    subject_code: string;
+    subject?: {
+      name: string;
+      code: string;
+    };
+    subject_name?: string;
+    subject_code?: string;
     marks: number;
     grade: string;
   }>;
@@ -93,22 +97,35 @@ const TeacherReports = () => {
     try {
       setLoading(true);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
+      console.log('Current user:', user);
       
       const [classesData, termsData] = await Promise.all([
         schoolsApi.getClasses(),
         schoolsApi.getTerms(),
       ]);
 
+      console.log('Classes data:', classesData);
+      console.log('Terms data:', termsData);
+
       const classesArray = Array.isArray(classesData) ? classesData : (classesData.results || []);
       const termsArray = Array.isArray(termsData) ? termsData : (termsData.results || []);
 
-      const myClasses = classesArray.filter((c: any) => c.class_teacher_user === user.id);
+      // For teachers, filter classes they teach
+      let myClasses = classesArray;
+      if (user.role === 'teacher') {
+        myClasses = classesArray.filter((c: any) => c.class_teacher_user === user.id);
+      }
+      
+      console.log('My classes:', myClasses);
+      
       setClasses(myClasses);
       setTerms(termsArray);
 
       const activeTerm = termsArray.find((t: any) => t.is_active);
       if (activeTerm) {
         setSelectedTerm(activeTerm.id.toString());
+      } else if (termsArray.length > 0) {
+        setSelectedTerm(termsArray[0].id.toString());
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -150,23 +167,28 @@ const TeacherReports = () => {
     setGenerating(true);
 
     try {
+      console.log('Generating report for:', { student_id: selectedStudent, term_id: selectedTerm });
+      
       const response = await reportsApi.generateReport({
         student_id: parseInt(selectedStudent),
         term_id: parseInt(selectedTerm),
       });
 
+      console.log('Generate response:', response);
       setReportId(response.report.id);
       
       toast({
         title: 'Success',
-        description: response.message,
+        description: response.message || 'Report generated successfully',
       });
 
+      // Automatically preview the generated report
       await handlePreviewReport(response.report.id);
     } catch (error: any) {
+      console.error('Generate report error:', error);
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to generate report',
+        description: error.response?.data?.error || error.message || 'Failed to generate report',
         variant: 'destructive',
       });
     } finally {
@@ -189,12 +211,15 @@ const TeacherReports = () => {
     setPreviewing(true);
 
     try {
+      console.log('Previewing report:', previewId);
       const preview = await reportsApi.previewReport(previewId.toString());
+      console.log('Preview response:', preview);
       setReportPreview(preview);
     } catch (error: any) {
+      console.error('Preview error:', error);
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to preview report',
+        description: error.response?.data?.error || error.message || 'Failed to preview report',
         variant: 'destructive',
       });
     } finally {
@@ -233,9 +258,194 @@ const TeacherReports = () => {
   };
 
   const handleDownloadReport = () => {
-    if (!reportPreview) return;
+    if (!reportPreview) {
+      toast({
+        title: 'Error',
+        description: 'No report to download',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    window.print();
+    // Create a new window with the report content
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Report Card - ${reportPreview.student.first_name} ${reportPreview.student.last_name}</title>
+            <style>
+              body { 
+                font-family: Arial, sans-serif; 
+                padding: 20px; 
+                margin: 0;
+                line-height: 1.4;
+              }
+              .header { 
+                text-align: center; 
+                margin-bottom: 30px; 
+                border-bottom: 2px solid #333;
+                padding-bottom: 20px;
+              }
+              .info { 
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-bottom: 30px; 
+                padding: 15px;
+                background: #f9f9f9;
+                border: 1px solid #ddd;
+              }
+              table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin: 20px 0; 
+              }
+              th, td { 
+                border: 1px solid #ddd; 
+                padding: 12px 8px; 
+                text-align: left; 
+              }
+              th { 
+                background-color: #f2f2f2; 
+                font-weight: bold;
+              }
+              .summary { 
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 15px;
+                margin: 30px 0; 
+              }
+              .summary-item {
+                text-align: center;
+                padding: 15px;
+                border: 1px solid #ddd;
+                background: #f9f9f9;
+              }
+              .summary-label {
+                font-size: 12px;
+                color: #666;
+                margin-bottom: 5px;
+              }
+              .summary-value {
+                font-size: 24px;
+                font-weight: bold;
+                color: #333;
+              }
+              .comments {
+                margin-top: 30px;
+                padding: 15px;
+                background: #f9f9f9;
+                border: 1px solid #ddd;
+              }
+              .comment-title {
+                font-weight: bold;
+                margin-bottom: 10px;
+                color: #333;
+              }
+              .footer {
+                text-align: center;
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 1px solid #ddd;
+                font-size: 12px;
+                color: #666;
+              }
+              @media print {
+                button { display: none; }
+                body { margin: 0; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Student Report Card</h1>
+              <h2>${reportPreview.term?.name || 'Academic Term'}</h2>
+            </div>
+            
+            <div class="info">
+              <div>
+                <strong>Student Name:</strong><br>
+                ${reportPreview.student?.first_name || ''} ${reportPreview.student?.last_name || ''}
+              </div>
+              <div>
+                <strong>Student Number:</strong><br>
+                ${reportPreview.student?.student_number || 'N/A'}
+              </div>
+              <div>
+                <strong>Class:</strong><br>
+                ${reportPreview.student?.class_name || 'N/A'} - Grade ${reportPreview.student?.grade_level || 'N/A'}
+              </div>
+              <div>
+                <strong>Term:</strong><br>
+                ${reportPreview.term?.name || 'N/A'}
+              </div>
+            </div>
+
+            <h3>Subject Performance</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th style="text-align: center;">Code</th>
+                  <th style="text-align: center;">Marks</th>
+                  <th style="text-align: center;">Grade</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${reportPreview.marks?.map((mark: any) => `
+                  <tr>
+                    <td>${mark.subject?.name || mark.subject_name || 'N/A'}</td>
+                    <td style="text-align: center;">${mark.subject?.code || mark.subject_code || 'N/A'}</td>
+                    <td style="text-align: center;">${mark.marks || 0}%</td>
+                    <td style="text-align: center; font-weight: bold;">${mark.grade || 'N/A'}</td>
+                  </tr>
+                `).join('') || '<tr><td colspan="4" style="text-align: center;">No marks available</td></tr>'}
+              </tbody>
+            </table>
+
+            <div class="summary">
+              <div class="summary-item">
+                <div class="summary-label">Total Marks</div>
+                <div class="summary-value">${reportPreview.total_marks || 0}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Average</div>
+                <div class="summary-value">${reportPreview.average_percentage ? reportPreview.average_percentage.toFixed(1) : '0.0'}%</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Overall Grade</div>
+                <div class="summary-value">${reportPreview.overall_grade || 'N/A'}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Position</div>
+                <div class="summary-value">${reportPreview.position || 'N/A'} / ${reportPreview.class_size || 'N/A'}</div>
+              </div>
+            </div>
+
+            ${reportPreview.teacher_comment ? `
+              <div class="comments">
+                <div class="comment-title">Teacher's Comment:</div>
+                <div>${reportPreview.teacher_comment}</div>
+              </div>
+            ` : ''}
+
+            ${reportPreview.headteacher_comment ? `
+              <div class="comments">
+                <div class="comment-title">Headteacher's Comment:</div>
+                <div>${reportPreview.headteacher_comment}</div>
+              </div>
+            ` : ''}
+
+            <div class="footer">
+              <p>Generated on ${new Date(reportPreview.generated_at).toLocaleDateString()}</p>
+              <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; background: #4CAF50; color: white; border: none; cursor: pointer; border-radius: 4px;">Print / Save as PDF</button>
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   };
 
   const getGradeColor = (grade: string): string => {
@@ -452,8 +662,8 @@ const TeacherReports = () => {
                         <tbody>
                           {reportPreview.marks.map((mark, index) => (
                             <tr key={index} className="border-b last:border-0">
-                              <td className="p-3">{mark.subject}</td>
-                              <td className="text-center p-3">{mark.subject_code}</td>
+                              <td className="p-3">{mark.subject?.name || mark.subject_name || 'N/A'}</td>
+                              <td className="text-center p-3">{mark.subject?.code || mark.subject_code || 'N/A'}</td>
                               <td className="text-center p-3">{mark.marks}</td>
                               <td className={`text-center p-3 ${getGradeColor(mark.grade)}`}>
                                 {mark.grade}
@@ -476,7 +686,7 @@ const TeacherReports = () => {
                     <div className="p-4 bg-green-50 rounded-lg text-center">
                       <p className="text-sm text-gray-600">Average</p>
                       <p className="text-2xl font-bold text-green-600">
-                        {reportPreview.average_percentage.toFixed(1)}%
+                        {reportPreview.average_percentage ? reportPreview.average_percentage.toFixed(1) : '0.0'}%
                       </p>
                     </div>
                     <div className="p-4 bg-purple-50 rounded-lg text-center">

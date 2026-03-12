@@ -19,6 +19,7 @@ interface User {
   role: string;
   first_name?: string;
   last_name?: string;
+  full_name?: string;
 }
 
 interface ParentDashboardProps {
@@ -88,7 +89,14 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
       // Fetch grades
       const gradesResponse = await academicsApi.getMarks({ student: studentId });
       const gradesData = gradesResponse.results || gradesResponse;
-      setGrades(Array.isArray(gradesData) ? gradesData : []);
+      const gradesArray = Array.isArray(gradesData) ? gradesData : [];
+      
+      console.log('Grades data:', gradesArray);
+      if (gradesArray.length > 0) {
+        console.log('First grade object:', gradesArray[0]);
+      }
+      
+      setGrades(gradesArray);
 
       // Fetch attendance
       const attendanceResponse = await studentsApi.getAttendance({ student: studentId });
@@ -106,7 +114,13 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
 
   const calculateAverageGrade = () => {
     if (!grades || grades.length === 0) return 'N/A';
-    const total = grades.reduce((sum, grade) => sum + (grade.total_marks || 0), 0);
+    
+    // Try different field names that might contain the marks
+    const total = grades.reduce((sum, grade) => {
+      const marks = grade.total_marks || grade.marks || 0;
+      return sum + parseFloat(marks);
+    }, 0);
+    
     const avg = total / grades.length;
     return avg.toFixed(1);
   };
@@ -455,7 +469,7 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
                           <div>
                             <p className="font-medium">{report.term_name} Report Card</p>
                             <p className="text-sm text-gray-600">
-                              Average: {report.average}% | Grade: {report.grade} | Position: {report.class_position}
+                              Average: {report.average_percentage}% | Grade: {report.overall_grade} | Position: {report.position || 'N/A'}
                             </p>
                             {report.teacher_comment && (
                               <p className="text-sm text-gray-500 mt-1">Comment: {report.teacher_comment}</p>
@@ -469,12 +483,6 @@ const ParentDashboard = ({ user, onLogout }: ParentDashboardProps) => {
                             onClick={() => handlePreviewReport(report.id)}
                           >
                             Preview
-                          </Button>
-                          <Button 
-                            size="sm"
-                            onClick={() => handleDownloadReport(report.id)}
-                          >
-                            Download
                           </Button>
                         </div>
                       </div>

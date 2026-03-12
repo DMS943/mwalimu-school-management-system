@@ -6,6 +6,7 @@ class MarkSerializer(serializers.ModelSerializer):
     subject_code = serializers.CharField(source='subject.code', read_only=True)
     term_name = serializers.CharField(source='term.name', read_only=True)
     student_name = serializers.SerializerMethodField()
+    total_marks = serializers.DecimalField(source='marks', max_digits=5, decimal_places=2, read_only=True)
     
     class Meta:
         model = Mark

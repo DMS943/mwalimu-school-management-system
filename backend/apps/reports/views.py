@@ -156,9 +156,12 @@ class ReportViewSet(viewsets.ModelViewSet):
         ).select_related('subject')
         
         marks_data = [{
-            'subject': mark.subject.name,
-            'subject_code': mark.subject.code,
-            'marks': float(mark.marks),
+            'subject': {
+                'name': mark.subject.name,
+                'code': mark.subject.code,
+            },
+            'subject_name': mark.subject.name,
+            'total_marks': float(mark.marks),
             'grade': mark.grade,
         } for mark in marks]
         
@@ -169,9 +172,15 @@ class ReportViewSet(viewsets.ModelViewSet):
             'student_number': student.student_number,
             'first_name': student.first_name,
             'last_name': student.last_name,
-            'class_name': student.class_assigned.name if student.class_assigned else None,
-            'grade_level': student.class_assigned.grade_level if student.class_assigned else None,
         }
+        
+        # Get class details
+        class_data = None
+        if student.class_assigned:
+            class_data = {
+                'name': student.class_assigned.name,
+                'grade_level': student.class_assigned.grade_level,
+            }
         
         # Get term details
         term_data = {
@@ -184,13 +193,13 @@ class ReportViewSet(viewsets.ModelViewSet):
         report_data = {
             'id': report.id,
             'student': student_data,
+            'class_assigned': class_data,
             'term': term_data,
             'marks': marks_data,
             'total_marks': float(report.total_marks),
-            'average_percentage': float(report.average_percentage),
-            'overall_grade': report.overall_grade,
-            'position': report.position,
-            'class_size': report.class_size,
+            'average': float(report.average_percentage),
+            'grade': report.overall_grade,
+            'class_position': f"{report.position}/{report.class_size}" if report.position and report.class_size else 'N/A',
             'teacher_comment': report.teacher_comment,
             'headteacher_comment': report.headteacher_comment,
             'generated_at': report.generated_at,

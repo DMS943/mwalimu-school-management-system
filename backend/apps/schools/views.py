@@ -97,23 +97,52 @@ class ScheduleViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def my_schedule(self, request):
         """Get the current user's teaching schedule"""
-        user = request.user
-        
-        if user.role != 'teacher':
-            return Response({'error': 'Only teachers can view their schedule'}, status=403)
-        
-        # Get active term
-        active_term = Term.objects.filter(is_active=True).first()
-        
-        schedules = Schedule.objects.filter(
-            models.Q(class_assigned__class_teacher_user=user) | 
-            models.Q(teacher=user)
-        )
-        
-        if active_term:
-            schedules = schedules.filter(term=active_term)
-        
-        schedules = schedules.select_related('class_assigned', 'subject', 'teacher', 'term').order_by('day_of_week', 'start_time')
-        
-        serializer = self.get_serializer(schedules, many=True)
-        return Response(serializer.data)
+        try:
+            user = request.user
+            
+            if user.role != 'teacher':
+                return Response({'error': 'Only teachers can view their schedule'}, status=403)
+            
+            # Get active term
+            active_term = Term.objects.filter(is_active=True).first()
+            if not active_term:
+                # If no active term, get the first term
+                active_term = Term.objects.first()
+            
+            if not active_term:
+                return Response({
+                    'schedules': [],
+                    'term': None,
+                    'message': 'No terms found in the system'
+                })
+            
+            # Check if Schedule table exists
+            try:
+                schedules = Schedule.objects.filter(
+                    models.Q(class_assigned__class_teacher_user=user) | 
+                    models.Q(teacher=user),
+                    term=active_term
+                )
+                
+                schedules = schedules.select_related('class_assigned', 'subject', 'teacher', 'term').order_by('day_of_week', 'start_time')
+                
+                serializer = self.get_serializer(schedules, many=True)
+                return Response({
+                    'schedules': serializer.data,
+                    'term': active_term.name if active_term else None,
+                    'message': f'Found {schedules.count()} schedule entries'
+                })
+            except Exception as db_error:
+                # If schedules table doesn't exist or other DB error
+                return Response({
+                    'schedules': [],
+                    'term': active_term.name if active_term else None,
+                    'message': 'Schedule feature is not yet set up. Please contact the administrator.'
+                })
+            
+        except Exception as e:
+            return Response({
+                'error': f'Error loading schedule: {str(e)}',
+                'schedules': [],
+                'term': None
+            }, status=500)

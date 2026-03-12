@@ -51,10 +51,30 @@ const TeacherSchedule = () => {
     try {
       setLoading(true);
       const data = await schoolsApi.getMySchedule();
-      const schedulesArray = Array.isArray(data) ? data : (data.results || []);
+      
+      // Handle new response format with schedules array
+      let schedulesArray = [];
+      if (data.schedules) {
+        schedulesArray = data.schedules;
+      } else if (Array.isArray(data)) {
+        schedulesArray = data;
+      } else if (data.results) {
+        schedulesArray = data.results;
+      }
+      
       setSchedules(schedulesArray);
+      
+      // Show message if no schedules found
+      if (schedulesArray.length === 0) {
+        toast({
+          title: 'No Schedule Found',
+          description: data.message || 'No teaching schedule has been assigned yet.',
+          variant: 'default',
+        });
+      }
     } catch (error: any) {
       console.error('Error loading schedule:', error);
+      setSchedules([]); // Set empty array on error
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to load schedule',
