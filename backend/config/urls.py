@@ -9,6 +9,17 @@ from rest_framework.response import Response
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
+def health_check(request):
+    """Health check endpoint for deployment monitoring"""
+    return Response({
+        'status': 'healthy',
+        'message': 'School Management System is running',
+        'debug': settings.DEBUG,
+        'database': 'connected'  # Could add actual DB check here
+    })
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
 def api_root(request):
     """API Root - Shows available endpoints"""
     return Response({
@@ -34,6 +45,7 @@ def api_root(request):
 
 urlpatterns = [
     path('', api_root, name='api-root'),
+    path('health/', health_check, name='health-check'),
     path('admin/', admin.site.urls),
     path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

@@ -119,27 +119,49 @@ deploy-staging:
 # Deploy to Production
 deploy-production:
   stage: deploy
-  image: alpine:latest
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
   before_script:
-    - apk add --no-cache openssh-client
-    - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
-    - mkdir -p ~/.ssh
-    - chmod 700 ~/.ssh
-    - ssh-keyscan $PRODUCTION_SERVER >> ~/.ssh/known_hosts
+    - apk add --no-cache openssh-client git
+    - docker info
   script:
-    - echo "Deploying to production server..."
-    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "cd $PRODUCTION_PATH && git pull origin main"
-    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "cd $PRODUCTION_PATH/backend && source venv/bin/activate && pip install -r requirements-prod.txt"
-    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "cd $PRODUCTION_PATH/backend && source venv/bin/activate && python manage.py migrate"
-    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "cd $PRODUCTION_PATH/backend && source venv/bin/activate && python manage.py collectstatic --noinput"
-    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "cd $PRODUCTION_PATH && npm install && npm run build"
-    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "sudo systemctl restart school-backend"
-    - ssh $PRODUCTION_USER@$PRODUCTION_SERVER "sudo systemctl restart nginx"
-    - echo "Production deployment completed"
+    - echo "Starting production deployment..."
+    
+    # Create .env file for production
+    - |
+      cat > .env.production << EOF
+      DEBUG=False
+      SECRET_KEY=${SECRET_KEY}
+      DATABASE_NAME=${DATABASE_NAME}
+      DATABASE_USER=${DATABASE_USER}
+      DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      DATABASE_HOST=postgres
+      DATABASE_PORT=5432
+      ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      EOF
+    
+    # Build and deploy with Docker Compose
+    - docker-compose -f docker-compose.prod.yml --env-file .env.production build
+    - docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
+    
+    # Run migrations
+    - docker-compose -f docker-compose.prod.yml exec -T backend python manage.py migrate
+    - docker-compose -f docker-compose.prod.yml exec -T backend python manage.py collectstatic --noinput
+    
+    # Health check
+    - sleep 30
+    - docker-compose -f docker-compose.prod.yml ps
+    
+    - echo "Production deployment completed successfully"
   environment:
     name: production
     url: https://yourschool.com
   only:
     - main
   when: manual
+  timeout: 30m
