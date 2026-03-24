@@ -1,6 +1,8 @@
-# School Management System
+# Mwalimu School Management System
 
 A comprehensive school management system built with Django REST Framework backend and React TypeScript frontend. This system provides role-based access for administrators, teachers, students, and parents with features for academic management, reporting, and communication.
+
+*Mwalimu* means "teacher" in Swahili and represents our commitment to empowering educators and enhancing learning experiences across Zambian schools.
 
 ## 🚀 Features
 
@@ -68,7 +70,7 @@ A comprehensive school management system built with Django REST Framework backen
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd school-management-system
+cd mwalimu-school-system
 ```
 
 ### 2. Backend Setup
@@ -186,7 +188,7 @@ python generate_secret_key.py
 ## 📁 Project Structure
 
 ```
-school-management-system/
+mwalimu-school-system/
 ├── backend/                    # Django backend
 │   ├── apps/                  # Django applications
 │   │   ├── academics/         # Academic management
@@ -372,4 +374,4 @@ To update the system:
 
 ---
 
-**Built with ❤️ for educational institutions**
+**Built with ❤️ for Zambian educational institutions**

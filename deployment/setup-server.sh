@@ -48,7 +48,7 @@ sudo chown -R $USER:$USER /var/www/school-management
 # Clone repository
 echo "Cloning repository..."
 cd /var/www
-git clone git@gitlab.com:sikapandadavid98/cumulative-score-and-rank-analyzer.git school-management
+git clone git@gitlab.com:sikapandadavid98/mwalimu-school-system.git school-management
 cd school-management
 
 # Setup backend
