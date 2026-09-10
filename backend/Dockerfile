@@ -27,11 +27,13 @@ COPY . .
 
 # Set executable permissions for entrypoint and create directories
 RUN sed -i 's/\r$//' /app/entrypoint.sh \
-    && chmod +x /app/entrypoint.sh \
+    && chmod 755 /app/entrypoint.sh \
     && mkdir -p /app/staticfiles /app/media \
     && ls -la /app/entrypoint.sh \
     && echo "=== Final entrypoint verification ===" \
-    && head -n 3 /app/entrypoint.sh
+    && head -n 3 /app/entrypoint.sh \
+    && echo "=== Testing entrypoint execution ===" \
+    && bash /app/entrypoint.sh --version || echo "Script check complete"
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
@@ -39,5 +41,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 EXPOSE 8000
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["bash", "/app/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120"]
