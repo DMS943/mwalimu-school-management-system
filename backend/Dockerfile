@@ -3,40 +3,38 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies in one layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     gcc \
     python3-dev \
     libpq-dev \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Copy requirements files first for better Docker layer caching
+# Copy and install Python dependencies
 COPY requirements.txt requirements-prod.txt ./
-
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip
-RUN pip install --no-cache-dir -r requirements-prod.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements-prod.txt \
+    && pip cache purge
 
 # Copy project files
 COPY . .
 
-# Create directories for static and media files with proper permissions
-RUN mkdir -p /app/staticfiles /app/media
+# Create directories and set permissions
+RUN mkdir -p /app/staticfiles /app/media \
+    && chmod +x /entrypoint.sh
 
-# Make sure the entrypoint script is executable
-RUN chmod +x /entrypoint.sh
-
-# Create non-root user for security but keep root for now to avoid permission issues
-# RUN addgroup --system django && adduser --system --group django
-# RUN chown -R django:django /app
-# USER django
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python manage.py check || exit 1
 
 EXPOSE 8000
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120"]

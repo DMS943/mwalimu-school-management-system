@@ -1,64 +1,39 @@
 #!/bin/bash
 set -e
 
-echo "=== Starting entrypoint script ==="
+echo "=== School Management System Startup ==="
 
-# Wait for database to be ready
-echo "=== Waiting for database ==="
-MAX_TRIES=60
-COUNT=0
-while ! pg_isready -h ${DATABASE_HOST:-postgres} -p ${DATABASE_PORT:-5432} -U ${DATABASE_USER:-school_admin}; do
-    echo "Database is unavailable - sleeping (attempt $COUNT/$MAX_TRIES)"
-    COUNT=$((COUNT + 1))
-    if [ $COUNT -gt $MAX_TRIES ]; then
-        echo "❌ Database failed to become ready after $MAX_TRIES attempts"
-        exit 1
-    fi
+# Simple database wait
+echo "Waiting for database..."
+until pg_isready -h ${DATABASE_HOST:-postgres} -p ${DATABASE_PORT:-5432} -U ${DATABASE_USER:-school_admin} -q; do
+    echo "Database not ready, waiting..."
     sleep 2
 done
-echo "✅ Database is up - continuing..."
+echo "✅ Database connected"
 
-# Run migrations
-echo "=== Running database migrations ==="
-python manage.py migrate --noinput || {
-    echo "❌ Migration failed, but continuing..."
-}
+# Run essential Django setup
+echo "Running migrations..."
+python manage.py migrate --noinput || echo "Migration skipped"
 
-# Collect static files
-echo "=== Collecting static files ==="
-python manage.py collectstatic --noinput || {
-    echo "❌ Static file collection failed, but continuing..."
-}
+echo "Collecting static files..."
+python manage.py collectstatic --noinput || echo "Static files skipped"
 
-# Create superuser if it doesn't exist
-echo "=== Creating superuser if needed ==="
+echo "Creating admin user..."
 python manage.py shell -c "
-import os
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
-
 User = get_user_model()
-try:
-    if not User.objects.filter(username='admin').exists():
+if not User.objects.filter(username='admin').exists():
+    try:
         if hasattr(User, 'role'):
-            # Custom user model with role field
             User.objects.create_superuser('admin', 'admin@school.com', 'admin123', role='admin')
         else:
-            # Default Django user model
             User.objects.create_superuser('admin', 'admin@school.com', 'admin123')
-        print('✅ Superuser created: admin/admin123')
-    else:
-        print('✅ Superuser already exists')
-except Exception as e:
-    print(f'⚠️ Superuser creation error: {e}')
-" || echo "⚠️ Superuser creation skipped or failed"
+        print('Admin user created')
+    except:
+        print('Admin user creation failed')
+else:
+    print('Admin user exists')
+" 2>/dev/null || echo "User setup skipped"
 
-# Check Django configuration
-echo "=== Running Django system check ==="
-python manage.py check || {
-    echo "⚠️ Django check found issues, but continuing..."
-}
-
-echo "✅ Entrypoint script completed successfully"
-echo "=== Starting application: $@ ==="
+echo "✅ Startup complete, launching application..."
 exec "$@"
