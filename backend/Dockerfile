@@ -22,12 +22,15 @@ COPY requirements.txt requirements-prod.txt ./
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements-prod.txt
 
-# Copy project files
+# Copy entrypoint separately and set permissions immediately
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# Copy the rest of the project files
 COPY . .
 
-# Create directories and set permissions
-RUN mkdir -p /app/staticfiles /app/media \
-    && chmod +x /app/entrypoint.sh
+# Create directories 
+RUN mkdir -p /app/staticfiles /app/media
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
