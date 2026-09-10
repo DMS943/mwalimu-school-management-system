@@ -30,11 +30,12 @@ RUN sed -i 's/\r$//' /app/entrypoint.sh \
     && chmod +x /app/entrypoint.sh \
     && ls -la /app/entrypoint.sh
 
-# Copy the rest of the project files
+# Copy the rest of the project files (entrypoint.sh excluded via .dockerignore)
 COPY . .
 
-# Create directories and final permission check
+# Create directories and ensure entrypoint permissions (failsafe)
 RUN mkdir -p /app/staticfiles /app/media \
+    && chmod +x /app/entrypoint.sh \
     && ls -la /app/entrypoint.sh \
     && echo "=== Final entrypoint verification ===" \
     && head -n 3 /app/entrypoint.sh
