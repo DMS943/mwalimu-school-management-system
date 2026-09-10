@@ -28,8 +28,7 @@ COPY entrypoint.sh /app/entrypoint.sh
 # Fix line endings and set executable permissions 
 RUN sed -i 's/\r$//' /app/entrypoint.sh \
     && chmod +x /app/entrypoint.sh \
-    && ls -la /app/entrypoint.sh \
-    && file /app/entrypoint.sh
+    && ls -la /app/entrypoint.sh
 
 # Copy the rest of the project files
 COPY . .
