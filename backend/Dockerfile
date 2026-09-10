@@ -24,13 +24,21 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 # Copy entrypoint separately and set permissions immediately
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+
+# Fix line endings and set executable permissions 
+RUN sed -i 's/\r$//' /app/entrypoint.sh \
+    && chmod +x /app/entrypoint.sh \
+    && ls -la /app/entrypoint.sh \
+    && file /app/entrypoint.sh
 
 # Copy the rest of the project files
 COPY . .
 
-# Create directories 
-RUN mkdir -p /app/staticfiles /app/media
+# Create directories and final permission check
+RUN mkdir -p /app/staticfiles /app/media \
+    && ls -la /app/entrypoint.sh \
+    && echo "=== Final entrypoint verification ===" \
+    && head -n 3 /app/entrypoint.sh
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
