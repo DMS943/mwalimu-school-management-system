@@ -1,19 +1,6 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:15
-    container_name: school_postgres
-    environment:
-      POSTGRES_DB: ${DATABASE_NAME}
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - school_network
-    restart: unless-stopped
-
   backend:
     build:
       context: ./backend
@@ -27,15 +14,13 @@ services:
     environment:
       - DEBUG=False
       - SECRET_KEY=${SECRET_KEY}
-      - DATABASE_NAME=${DATABASE_NAME}
-      - DATABASE_USER=${DATABASE_USER}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_HOST=postgres
-      - DATABASE_PORT=5432
+      - DATABASE_NAME=${SUPABASE_DB_NAME}
+      - DATABASE_USER=${SUPABASE_DB_USER}
+      - DATABASE_PASSWORD=${SUPABASE_DB_PASSWORD}
+      - DATABASE_HOST=${SUPABASE_DB_HOST}
+      - DATABASE_PORT=${SUPABASE_DB_PORT}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
-    depends_on:
-      - postgres
     networks:
       - school_network
     restart: unless-stopped
@@ -71,7 +56,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
   static_volume:
   media_volume:
   frontend_build:

@@ -3,13 +3,25 @@ set -e
 
 echo "=== School Management System Startup ==="
 
-# Simple database wait
-echo "Waiting for database..."
-until pg_isready -h ${DATABASE_HOST:-postgres} -p ${DATABASE_PORT:-5432} -U ${DATABASE_USER:-school_admin} -q; do
-    echo "Database not ready, waiting..."
-    sleep 2
-done
-echo "✅ Database connected"
+# Simple database connection test to Supabase
+echo "Testing Supabase connection..."
+python -c "
+import os, psycopg2, sys
+try:
+    conn = psycopg2.connect(
+        host=os.environ.get('DATABASE_HOST', 'localhost'),
+        database=os.environ.get('DATABASE_NAME', 'postgres'),
+        user=os.environ.get('DATABASE_USER', 'postgres'),
+        password=os.environ.get('DATABASE_PASSWORD', ''),
+        port=os.environ.get('DATABASE_PORT', '5432'),
+        connect_timeout=10
+    )
+    print('✅ Supabase connection successful')
+    conn.close()
+except Exception as e:
+    print(f'❌ Supabase connection failed: {e}')
+    sys.exit(1)
+"
 
 # Run essential Django setup
 echo "Running migrations..."
@@ -29,8 +41,8 @@ if not User.objects.filter(username='admin').exists():
         else:
             User.objects.create_superuser('admin', 'admin@school.com', 'admin123')
         print('Admin user created')
-    except:
-        print('Admin user creation failed')
+    except Exception as e:
+        print(f'Admin user creation failed: {e}')
 else:
     print('Admin user exists')
 " 2>/dev/null || echo "User setup skipped"
