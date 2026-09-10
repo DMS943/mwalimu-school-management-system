@@ -131,16 +131,30 @@ deploy-production:
     - docker info
     # Verify required environment variables
     - |
-      if [ -z "$SECRET_KEY" ] || [ -z "$DATABASE_NAME" ] || [ -z "$DATABASE_USER" ] || [ -z "$DATABASE_PASSWORD" ]; then
-        echo "ERROR: Missing required environment variables"
-        echo "Please set: SECRET_KEY, DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD in GitLab CI/CD variables"
+      echo "=== Environment Variable Check ==="
+      if [ -z "$SECRET_KEY" ]; then
+        echo "ERROR: SECRET_KEY not set"
         exit 1
       fi
+      if [ -z "$DATABASE_NAME" ]; then
+        echo "ERROR: DATABASE_NAME not set"
+        exit 1
+      fi
+      if [ -z "$DATABASE_USER" ]; then
+        echo "ERROR: DATABASE_USER not set"
+        exit 1
+      fi
+      if [ -z "$DATABASE_PASSWORD" ]; then
+        echo "ERROR: DATABASE_PASSWORD not set"
+        exit 1
+      fi
+      echo "✅ All required environment variables are set"
   script:
-    - echo "Starting production deployment..."
+    - echo "=== Starting production deployment ==="
     
     # Create .env file for production
     - |
+      echo "=== Creating .env.production file ==="
       cat > .env.production << EOF
       DEBUG=False
       SECRET_KEY=${SECRET_KEY}
@@ -152,38 +166,109 @@ deploy-production:
       ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
       CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       EOF
+      echo "✅ Environment file created"
+      echo "Contents (sanitized):"
+      cat .env.production | sed 's/SECRET_KEY=.*/SECRET_KEY=***/' | sed 's/DATABASE_PASSWORD=.*/DATABASE_PASSWORD=***/'
     
     # Stop any existing containers
-    - docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+    - |
+      echo "=== Stopping existing containers ==="
+      docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+      echo "✅ Containers stopped"
     
-    # Build images
-    - echo "Building Docker images..."
-    - docker-compose -f docker-compose.prod.yml --env-file .env.production build --no-cache
+    # Build images with detailed output
+    - |
+      echo "=== Building Docker images ==="
+      set -e
+      docker-compose -f docker-compose.prod.yml --env-file .env.production build --no-cache 2>&1 | tee build.log
+      if [ $? -ne 0 ]; then
+        echo "❌ Docker build failed"
+        echo "=== Build log tail ==="
+        tail -50 build.log
+        exit 1
+      fi
+      echo "✅ Images built successfully"
     
-    # Start services
-    - echo "Starting services..."
-    - docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postgres
-    - sleep 15
+    # Start database with monitoring
+    - |
+      echo "=== Starting PostgreSQL database ==="
+      docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postgres
+      echo "Waiting for database to initialize..."
+      sleep 20
+      
+      # Check database logs
+      echo "=== Database logs ==="
+      docker-compose -f docker-compose.prod.yml logs --tail=20 postgres
+      
+      # Test database connection
+      echo "=== Testing database connection ==="
+      RETRIES=30
+      while [ $RETRIES -gt 0 ]; do
+        if docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres pg_isready -U ${DATABASE_USER:-school_admin} -d ${DATABASE_NAME:-school_management}; then
+          echo "✅ Database is ready"
+          break
+        fi
+        echo "Database not ready, retrying... ($RETRIES attempts left)"
+        RETRIES=$((RETRIES-1))
+        sleep 2
+      done
+      
+      if [ $RETRIES -eq 0 ]; then
+        echo "❌ Database failed to start"
+        docker-compose -f docker-compose.prod.yml logs postgres
+        exit 1
+      fi
     
-    # Check database is ready
-    - docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres pg_isready -U ${DATABASE_USER:-school_admin} -d ${DATABASE_NAME:-school_management}
-    
-    # Start backend
-    - docker-compose -f docker-compose.prod.yml --env-file .env.production up -d backend
-    - sleep 30
+    # Start backend with monitoring
+    - |
+      echo "=== Starting backend service ==="
+      docker-compose -f docker-compose.prod.yml --env-file .env.production up -d backend
+      echo "Waiting for backend to initialize..."
+      sleep 30
+      
+      # Check backend logs
+      echo "=== Backend logs ==="
+      docker-compose -f docker-compose.prod.yml logs --tail=30 backend
+      
+      # Test backend health
+      echo "=== Testing backend health ==="
+      RETRIES=10
+      while [ $RETRIES -gt 0 ]; do
+        if docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T backend python manage.py check; then
+          echo "✅ Backend is healthy"
+          break
+        fi
+        echo "Backend not ready, retrying... ($RETRIES attempts left)"
+        RETRIES=$((RETRIES-1))
+        sleep 5
+      done
+      
+      if [ $RETRIES -eq 0 ]; then
+        echo "❌ Backend failed to start properly"
+        docker-compose -f docker-compose.prod.yml logs backend
+        exit 1
+      fi
     
     # Start frontend and nginx
-    - docker-compose -f docker-compose.prod.yml --env-file .env.production up -d frontend nginx
+    - |
+      echo "=== Starting frontend and nginx ==="
+      docker-compose -f docker-compose.prod.yml --env-file .env.production up -d frontend nginx
+      sleep 20
+      
+      # Check all container status
+      echo "=== Final container status ==="
+      docker-compose -f docker-compose.prod.yml ps
+      
+      # Check for any failed containers
+      if docker-compose -f docker-compose.prod.yml ps | grep -q "Exit"; then
+        echo "❌ Some containers have failed"
+        docker-compose -f docker-compose.prod.yml logs
+        exit 1
+      fi
+      
+      echo "✅ All services started successfully"
     
-    # Health check
-    - sleep 30
-    - docker-compose -f docker-compose.prod.yml ps
-    
-    # Test endpoints
-    - echo "Testing backend health..."
-    - timeout 60 sh -c 'until docker-compose -f docker-compose.prod.yml exec -T backend python manage.py check; do sleep 5; done'
-    
-    - echo "Production deployment completed successfully"
+    - echo "🎉 Production deployment completed successfully!"
   environment:
     name: production
     url: https://yourschool.com

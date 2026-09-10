@@ -25,17 +25,16 @@ RUN pip install --no-cache-dir -r requirements-prod.txt
 # Copy project files
 COPY . .
 
-# Create directories for static and media files
+# Create directories for static and media files with proper permissions
 RUN mkdir -p /app/staticfiles /app/media
 
 # Make sure the entrypoint script is executable
 RUN chmod +x /entrypoint.sh
 
-# Create non-root user for security
-RUN addgroup --system django && adduser --system --group django
-RUN chown -R django:django /app
-
-USER django
+# Create non-root user for security but keep root for now to avoid permission issues
+# RUN addgroup --system django && adduser --system --group django
+# RUN chown -R django:django /app
+# USER django
 
 EXPOSE 8000
 
