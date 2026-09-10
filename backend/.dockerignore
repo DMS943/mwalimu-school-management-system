@@ -1,6 +1,3 @@
-# Exclude entrypoint.sh from COPY . . since we handle it separately
-entrypoint.sh
-
 # Standard excludes
 .git
 .gitignore

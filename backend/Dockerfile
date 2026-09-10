@@ -22,20 +22,13 @@ COPY requirements.txt requirements-prod.txt ./
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements-prod.txt
 
-# Copy entrypoint separately and set permissions immediately
-COPY entrypoint.sh /app/entrypoint.sh
-
-# Fix line endings and set executable permissions 
-RUN sed -i 's/\r$//' /app/entrypoint.sh \
-    && chmod +x /app/entrypoint.sh \
-    && ls -la /app/entrypoint.sh
-
-# Copy the rest of the project files (entrypoint.sh excluded via .dockerignore)
+# Copy the entire project
 COPY . .
 
-# Create directories and ensure entrypoint permissions (failsafe)
-RUN mkdir -p /app/staticfiles /app/media \
+# Set executable permissions for entrypoint and create directories
+RUN sed -i 's/\r$//' /app/entrypoint.sh \
     && chmod +x /app/entrypoint.sh \
+    && mkdir -p /app/staticfiles /app/media \
     && ls -la /app/entrypoint.sh \
     && echo "=== Final entrypoint verification ===" \
     && head -n 3 /app/entrypoint.sh
