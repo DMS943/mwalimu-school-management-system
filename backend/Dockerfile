@@ -12,22 +12,30 @@ RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
     libpq-dev \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy requirements files first for better Docker layer caching
+COPY requirements.txt requirements-prod.txt ./
+
 # Install Python dependencies
-COPY requirements-prod.txt .
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements-prod.txt
 
-# Copy project
+# Copy project files
 COPY . .
 
 # Create directories for static and media files
 RUN mkdir -p /app/staticfiles /app/media
 
 # Make sure the entrypoint script is executable
-COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+# Create non-root user for security
+RUN addgroup --system django && adduser --system --group django
+RUN chown -R django:django /app
+
+USER django
 
 EXPOSE 8000
 
