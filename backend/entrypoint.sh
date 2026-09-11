@@ -3,9 +3,12 @@ set -e
 
 echo "=== School Management System Startup ==="
 
-# Simple database connection test to Supabase
-echo "Testing Supabase connection..."
-python -c "
+# Simple database connection test to Supabase (skip in CI)
+if [ "$CI" = "true" ] || [ -n "$GITLAB_CI" ]; then
+    echo "Skipping database connection test in CI environment..."
+else
+    echo "Testing Supabase connection..."
+    python -c "
 import os, psycopg2, sys
 try:
     conn = psycopg2.connect(
@@ -22,6 +25,7 @@ except Exception as e:
     print(f'❌ Supabase connection failed: {e}')
     sys.exit(1)
 "
+fi
 
 # Run essential Django setup
 echo "Running migrations..."
