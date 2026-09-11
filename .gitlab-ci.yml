@@ -200,34 +200,39 @@ deploy-production:
     - |
       echo "=== Starting services with Supabase ==="
       
-      # Test Supabase connection first
-      echo "Testing Supabase connection..."
-      docker run --rm --env-file .env.production \
-        $(docker-compose -f docker-compose.prod.yml config | grep 'image:.*backend' -A 1 | grep image | cut -d' ' -f4) \
-        python -c "
-      import os, psycopg2
-      conn = psycopg2.connect(
-          host=os.environ['SUPABASE_DB_HOST'],
-          database=os.environ['SUPABASE_DB_NAME'],
-          user=os.environ['SUPABASE_DB_USER'],
-          password=os.environ['SUPABASE_DB_PASSWORD'],
-          port=os.environ.get('SUPABASE_DB_PORT', '5432')
-      )
-      print('✅ Supabase connection successful')
-      conn.close()
-      " || (echo "❌ Supabase connection failed" && exit 1)
-      
-      # Start all services
+      # Start backend first
       echo "Starting backend..."
       docker-compose -f docker-compose.prod.yml --env-file .env.production up -d backend
       
-      # Wait for backend health check
-      echo "Waiting for backend health check..."
+      # Wait for backend to be ready
+      echo "Waiting for backend to be ready..."
       sleep 30
+      
+      # Test Supabase connection using the running backend container
+      echo "Testing Supabase connection..."
+      docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T backend bash -c "python -c \"
+import os, psycopg2
+try:
+    conn = psycopg2.connect(
+        host=os.environ['DATABASE_HOST'],
+        database=os.environ['DATABASE_NAME'], 
+        user=os.environ['DATABASE_USER'],
+        password=os.environ['DATABASE_PASSWORD'],
+        port=os.environ.get('DATABASE_PORT', '5432')
+    )
+    print('✅ Supabase connection successful')
+    conn.close()
+except Exception as e:
+    print('❌ Supabase connection failed:', str(e))
+    exit(1)
+\"" || (echo "❌ Supabase connection test failed" && docker-compose -f docker-compose.prod.yml logs backend && exit 1)
+      
+      # Run health check
+      echo "Running Django health check..."
       timeout 60 sh -c 'until docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T backend python manage.py check; do sleep 5; done'
       
       if [ $? -ne 0 ]; then
-        echo "❌ Backend startup failed"
+        echo "❌ Backend health check failed"
         docker-compose -f docker-compose.prod.yml logs backend
         exit 1
       fi
