@@ -155,7 +155,7 @@ deploy-production:
         echo "ERROR: SUPABASE_DB_HOST not set"
         exit 1
       fi
-      echo "✅ All required environment variables are set"
+      echo "All required environment variables are set"
   script:
     - echo "=== Starting production deployment with Supabase ==="
     
@@ -173,7 +173,7 @@ deploy-production:
       ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
       CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       EOF
-      echo "✅ Environment file created"
+      echo "Environment file created"
     
     # Clean up existing containers (no PostgreSQL to clean)
     - |
@@ -194,7 +194,7 @@ deploy-production:
       echo "Building frontend image..."
       docker-compose -f docker-compose.prod.yml --env-file .env.production build frontend
       
-      echo "✅ Images built successfully"
+      echo "Images built successfully"
     
     # Start services - no database container needed!
     - |
@@ -210,7 +210,7 @@ deploy-production:
       
       # Test Supabase connection using the running backend container
       echo "Testing Supabase connection..."
-      docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T backend bash -c "python -c \"
+      docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T backend python -c "
 import os, psycopg2
 try:
     conn = psycopg2.connect(
@@ -220,23 +220,23 @@ try:
         password=os.environ['DATABASE_PASSWORD'],
         port=os.environ.get('DATABASE_PORT', '5432')
     )
-    print('✅ Supabase connection successful')
+    print('Supabase connection successful')
     conn.close()
 except Exception as e:
-    print('❌ Supabase connection failed:', str(e))
+    print('Supabase connection failed:', str(e))
     exit(1)
-\"" || (echo "❌ Supabase connection test failed" && docker-compose -f docker-compose.prod.yml logs backend && exit 1)
+" || (echo "Supabase connection test failed" && docker-compose -f docker-compose.prod.yml logs backend && exit 1)
       
       # Run health check
       echo "Running Django health check..."
       timeout 60 sh -c 'until docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T backend python manage.py check; do sleep 5; done'
       
       if [ $? -ne 0 ]; then
-        echo "❌ Backend health check failed"
+        echo "Backend health check failed"
         docker-compose -f docker-compose.prod.yml logs backend
         exit 1
       fi
-      echo "✅ Backend ready"
+      echo "Backend ready"
       
       # Run migrations on Supabase
       echo "Running migrations on Supabase..."
@@ -247,7 +247,7 @@ except Exception as e:
       docker-compose -f docker-compose.prod.yml --env-file .env.production up -d frontend nginx
       
       sleep 20
-      echo "✅ All services started with Supabase"
+      echo "All services started with Supabase"
     
     # Final status check
     - |
@@ -255,12 +255,12 @@ except Exception as e:
       docker-compose -f docker-compose.prod.yml ps
       
       if docker-compose -f docker-compose.prod.yml ps | grep -q "Exit\|Restarting"; then
-        echo "❌ Some containers are not healthy"
+        echo "Some containers are not healthy"
         docker-compose -f docker-compose.prod.yml logs --tail=50
         exit 1
       fi
       
-      echo "🎉 Production deployment with Supabase completed successfully!"
+      echo "Production deployment with Supabase completed successfully!"
   environment:
     name: production
     url: https://yourschool.com
