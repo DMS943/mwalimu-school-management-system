@@ -210,22 +210,7 @@ deploy-production:
       
       # Test Supabase connection using the running backend container
       echo "Testing Supabase connection..."
-      docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T backend python -c "
-import os, psycopg2
-try:
-    conn = psycopg2.connect(
-        host=os.environ['DATABASE_HOST'],
-        database=os.environ['DATABASE_NAME'], 
-        user=os.environ['DATABASE_USER'],
-        password=os.environ['DATABASE_PASSWORD'],
-        port=os.environ.get('DATABASE_PORT', '5432')
-    )
-    print('Supabase connection successful')
-    conn.close()
-except Exception as e:
-    print('Supabase connection failed:', str(e))
-    exit(1)
-" || (echo "Supabase connection test failed" && docker-compose -f docker-compose.prod.yml logs backend && exit 1)
+      docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T backend python -c "import os, psycopg2; conn = psycopg2.connect(host=os.environ['DATABASE_HOST'], database=os.environ['DATABASE_NAME'], user=os.environ['DATABASE_USER'], password=os.environ['DATABASE_PASSWORD'], port=os.environ.get('DATABASE_PORT', '5432')); print('Supabase connection successful'); conn.close()" || (echo "Supabase connection test failed" && docker-compose -f docker-compose.prod.yml logs backend && exit 1)
       
       # Run health check
       echo "Running Django health check..."
