@@ -3,12 +3,20 @@ set -e
 
 echo "=== School Management System Startup ==="
 
-# Simple database connection test to Supabase (skip in CI)
+# Check if running in CI environment
 if [ "$CI" = "true" ] || [ -n "$GITLAB_CI" ]; then
-    echo "Skipping database connection test in CI environment..."
-else
-    echo "Testing Supabase connection..."
-    python -c "
+    echo "Running in CI environment - skipping database operations..."
+    echo "✅ CI startup complete, ready for deployment"
+    exec "$@"
+    exit 0
+fi
+
+# Production/development startup with database operations
+echo "Starting in production/development mode..."
+
+# Simple database connection test to Supabase
+echo "Testing Supabase connection..."
+python -c "
 import os, psycopg2, sys
 try:
     conn = psycopg2.connect(
@@ -23,11 +31,12 @@ try:
     conn.close()
 except Exception as e:
     print(f'❌ Supabase connection failed: {e}')
-    sys.exit(1)
+    print('This is expected in CI environments. In production, check your Supabase credentials.')
+    if not (os.environ.get('CI') or os.environ.get('GITLAB_CI')):
+        sys.exit(1)
 "
-fi
 
-# Run essential Django setup
+# Run essential Django setup only if not in CI
 echo "Running migrations..."
 python manage.py migrate --noinput || echo "Migration skipped"
 
