@@ -48,3 +48,7 @@ pre-commit==4.0.1
 
 # Load testing
 locust==2.32.2
+
+# Additional test utilities
+coverage==7.6.9
+pytest-html==4.1.1
