@@ -8,7 +8,12 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "lint:fix": "eslint . --fix",
+    "preview": "vite preview",
+    "test": "echo 'No tests specified yet' && exit 0",
+    "test:watch": "echo 'No tests specified yet'",
+    "type-check": "tsc --noEmit",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -75,9 +80,10 @@
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
     "postcss": "^8.4.47",
+    "prettier": "^3.0.0",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^7.3.1"
+    "vite": "^6.0.0"
   }
 }
