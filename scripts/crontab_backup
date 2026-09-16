@@ -1,0 +1,28 @@
+# Mwalimu School Management System - Backup Crontab Configuration
+# Install with: crontab scripts/crontab_backup
+# View with: crontab -l
+
+# Environment variables
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DJANGO_SETTINGS_MODULE=config.production
+BACKUP_DIR=/opt/backups
+PROJECT_ROOT=/opt/mwalimu-school
+
+# Daily backup at 2:00 AM
+0 2 * * * cd $PROJECT_ROOT && /usr/bin/python3 scripts/backup_scheduler.py daily >> /var/log/cron-backup.log 2>&1
+
+# Weekly cleanup and verification on Sundays at 3:00 AM
+0 3 * * 0 cd $PROJECT_ROOT && /usr/bin/python3 scripts/backup_scheduler.py weekly >> /var/log/cron-backup.log 2>&1
+
+# Monthly optimization on the 1st of each month at 4:00 AM
+0 4 1 * * cd $PROJECT_ROOT && /usr/bin/python3 scripts/backup_scheduler.py monthly >> /var/log/cron-backup.log 2>&1
+
+# Database health monitoring every 15 minutes during business hours (8 AM - 6 PM)
+*/15 8-18 * * 1-5 cd $PROJECT_ROOT/backend && /usr/bin/python3 manage.py monitor_database --output json --file /var/log/db_health_$(date +\%Y\%m\%d_\%H\%M).json >> /var/log/cron-monitoring.log 2>&1
+
+# Clean up old monitoring logs weekly (keep 30 days)
+0 1 * * 0 find /var/log -name "db_health_*.json" -mtime +30 -delete
+
+# Clean up old cron logs monthly (keep 90 days)
+0 5 1 * * find /var/log -name "cron-*.log" -mtime +90 -delete

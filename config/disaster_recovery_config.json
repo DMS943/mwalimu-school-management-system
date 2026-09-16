@@ -1,0 +1,149 @@
+{
+  "disaster_recovery": {
+    "enabled": true,
+    "monitoring_interval": 300,
+    "auto_recovery_enabled": true,
+    "max_recovery_attempts": 3,
+    "notification_channels": {
+      "email": {
+        "enabled": true,
+        "recipients": [
+          "admin@yourschool.com",
+          "it-team@yourschool.com"
+        ]
+      },
+      "slack": {
+        "enabled": true,
+        "webhook_url": "${SLACK_WEBHOOK_URL}",
+        "channel": "#alerts"
+      },
+      "sms": {
+        "enabled": false,
+        "recipients": []
+      }
+    }
+  },
+  "backup_tiers": {
+    "local": {
+      "enabled": true,
+      "path": "/opt/backups/local",
+      "retention_days": 7,
+      "frequency_hours": 4,
+      "compression": true,
+      "encryption": true
+    },
+    "regional": {
+      "enabled": true,
+      "path": "/opt/backups/regional",
+      "retention_days": 30,
+      "frequency_hours": 24,
+      "compression": true,
+      "encryption": true
+    },
+    "offsite": {
+      "enabled": true,
+      "provider": "aws_s3",
+      "bucket": "${S3_BACKUP_BUCKET}",
+      "region": "${AWS_REGION}",
+      "retention_days": 90,
+      "frequency_hours": 24,
+      "compression": true,
+      "encryption": true,
+      "storage_class": "STANDARD_IA"
+    },
+    "archive": {
+      "enabled": true,
+      "provider": "aws_glacier",
+      "vault": "${GLACIER_VAULT}",
+      "retention_years": 7,
+      "frequency_days": 7,
+      "compression": true,
+      "encryption": true
+    }
+  },
+  "recovery_objectives": {
+    "database": {
+      "rto_minutes": 15,
+      "rpo_minutes": 5,
+      "priority": "critical"
+    },
+    "application": {
+      "rto_minutes": 30,
+      "rpo_minutes": 15,
+      "priority": "high"
+    },
+    "media_files": {
+      "rto_hours": 2,
+      "rpo_hours": 1,
+      "priority": "medium"
+    },
+    "reports": {
+      "rto_hours": 4,
+      "rpo_hours": 4,
+      "priority": "low"
+    }
+  },
+  "health_checks": {
+    "endpoints": [
+      "http://localhost:8000/monitoring/health/",
+      "http://localhost:8000/monitoring/ready/"
+    ],
+    "database_check": {
+      "enabled": true,
+      "timeout_seconds": 30
+    },
+    "storage_check": {
+      "enabled": true,
+      "threshold_percent": 85
+    },
+    "network_check": {
+      "enabled": true,
+      "timeout_seconds": 10
+    }
+  },
+  "compliance": {
+    "standards": ["FERPA", "GDPR", "SOX", "ISO27001"],
+    "audit_logging": true,
+    "data_classification": {
+      "student_records": {
+        "sensitivity": "high",
+        "retention_years": 7,
+        "encryption_required": true
+      },
+      "personal_data": {
+        "sensitivity": "high", 
+        "retention_years": 1,
+        "encryption_required": true
+      },
+      "financial_data": {
+        "sensitivity": "high",
+        "retention_years": 7,
+        "encryption_required": true
+      },
+      "system_logs": {
+        "sensitivity": "medium",
+        "retention_years": 3,
+        "encryption_required": true
+      }
+    }
+  },
+  "testing": {
+    "automated_testing": true,
+    "test_schedule": {
+      "backup_validation": "daily",
+      "recovery_test": "weekly",
+      "full_dr_test": "monthly",
+      "compliance_audit": "quarterly"
+    },
+    "test_environments": {
+      "staging": {
+        "enabled": true,
+        "auto_refresh": true
+      },
+      "dr_test": {
+        "enabled": true,
+        "isolated": true
+      }
+    }
+  }
+}

@@ -1,60 +1,53 @@
+"""
+URL Configuration for Mwalimu School Management System.
+"""
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
+from apps.core import views
 
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def health_check(request):
-    """Health check endpoint for deployment monitoring"""
-    return Response({
-        'status': 'healthy',
-        'message': 'School Management System is running',
-        'debug': settings.DEBUG,
-        'database': 'connected'  # Could add actual DB check here
-    })
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def api_root(request):
-    """API Root - Shows available endpoints"""
-    return Response({
-        'message': 'School Management System API',
-        'version': '1.0',
-        'status': 'running',
-        'endpoints': {
-            'admin': '/admin/',
-            'api': {
-                'auth': {
-                    'login': '/api/auth/token/',
-                    'refresh': '/api/auth/token/refresh/',
-                },
-                'users': '/api/users/',
-                'schools': '/api/schools/',
-                'students': '/api/students/',
-                'academics': '/api/academics/',
-                'reports': '/api/reports/',
-            }
-        },
-        'note': 'Most endpoints require authentication. Use /api/auth/token/ to login.'
-    })
-
-urlpatterns = [
-    path('', api_root, name='api-root'),
-    path('health/', health_check, name='health-check'),
-    path('admin/', admin.site.urls),
-    path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/users/', include('apps.users.urls')),
-    path('api/schools/', include('apps.schools.urls')),
-    path('api/students/', include('apps.students.urls')),
-    path('api/academics/', include('apps.academics.urls')),
-    path('api/reports/', include('apps.reports.urls')),
+# API URL patterns
+api_patterns = [
+    path('auth/', include('apps.users.urls')),
+    path('schools/', include('apps.schools.urls')),
+    path('students/', include('apps.students.urls')),
+    path('academics/', include('apps.academics.urls')),
+    path('reports/', include('apps.reports.urls')),
 ]
 
+# Health check and monitoring URLs
+monitoring_patterns = [
+    path('health/', views.health_check, name='health_check'),
+    path('ready/', views.ready_check, name='ready_check'),
+    path('alive/', views.alive_check, name='alive_check'),
+    path('metrics/', views.SystemMetricsView.as_view(), name='system_metrics'),
+    path('database/', views.DatabaseMetricsView.as_view(), name='database_metrics'),
+    path('prometheus/', views.metrics_prometheus, name='prometheus_metrics'),
+]
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/', include(api_patterns)),
+    path('monitoring/', include(monitoring_patterns)),
+]
+
+# Serve media files in development
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    
+    # Add debug toolbar URLs if available
+    try:
+        import debug_toolbar
+        urlpatterns = [
+            path('__debug__/', include(debug_toolbar.urls)),
+        ] + urlpatterns
+    except ImportError:
+        pass
+
+# Custom error handlers
+handler400 = 'apps.core.views.bad_request_view'
+handler403 = 'apps.core.views.permission_denied_view'
+handler404 = 'apps.core.views.not_found_view'
+handler500 = 'apps.core.views.server_error_view'

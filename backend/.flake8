@@ -1,0 +1,44 @@
+[flake8]
+max-line-length = 88
+max-complexity = 10
+exclude = 
+    .git,
+    __pycache__,
+    .pytest_cache,
+    .coverage,
+    venv,
+    env,
+    migrations,
+    build,
+    dist,
+    .mypy_cache
+
+ignore = 
+    # Line too long (handled by black)
+    E501,
+    # Line break before binary operator (conflict with black)
+    W503,
+    # Line break after binary operator (conflict with black) 
+    W504,
+    # Multiple imports on one line (handled by isort)
+    E401,
+
+per-file-ignores = 
+    # Tests can have longer lines and different complexity
+    */tests/*:E501,C901
+    # Settings files can be complex
+    */settings/*:E501,C901
+    # Init files can have multiple imports
+    */__init__.py:F401
+    # Django apps config
+    */apps.py:F401
+
+select = 
+    E,  # pycodestyle errors
+    W,  # pycodestyle warnings  
+    F,  # pyflakes
+    C,  # mccabe complexity
+    DJ, # flake8-django
+
+# Django-specific settings
+django-settings-module = config.settings

@@ -4,94 +4,400 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from django.utils import timezone
+from django.core.cache import cache
+import logging
+
 from .models import User
-from .serializers import UserSerializer, UserCreateSerializer
+from .serializers import (
+    UserSerializer, UserCreateSerializer, UserUpdateSerializer,
+    LoginSerializer, PasswordChangeSerializer, PasswordResetRequestSerializer,
+    PasswordResetConfirmSerializer, ParentSignupSerializer
+)
+from apps.core.permissions import (
+    IsTeacherOrHigher, IsAdminOnly, CanManageUsers, 
+    IsOwnerOrReadOnly, IPWhitelistPermission
+)
+
+logger = logging.getLogger(__name__)
+
 
 class UserViewSet(viewsets.ModelViewSet):
+    """Secure user management viewset."""
+    
     queryset = User.objects.all()
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, CanManageUsers]
     
     def get_serializer_class(self):
         if self.action == 'create':
             return UserCreateSerializer
+        elif self.action in ['update', 'partial_update']:
+            return UserUpdateSerializer
         return UserSerializer
     
-    @action(detail=False, methods=['get'])
+    def get_queryset(self):
+        """Filter users based on user role."""
+        user = self.request.user
+        
+        if user.role == 'admin':
+            return User.objects.all()
+        elif user.role == 'headteacher':
+            # Headteachers can manage teachers, HODs, and parents
+            return User.objects.filter(role__in=['teacher', 'hod', 'parent'])
+        else:
+            # Other roles can only see themselves
+            return User.objects.filter(id=user.id)
+    
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def me(self, request):
+        """Get current user profile."""
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def change_password(self, request):
+        """Change user password."""
+        serializer = PasswordChangeSerializer(
+            data=request.data, 
+            context={'request': request}
+        )
+        
+        if serializer.is_valid():
+            serializer.save()
+            
+            # Log password change
+            logger.info(
+                f"Password changed for user {request.user.username}",
+                extra={
+                    'user_id': request.user.id,
+                    'ip': request.META.get('REMOTE_ADDR'),
+                }
+            )
+            
+            return Response({
+                'success': True,
+                'message': 'Password changed successfully.'
+            })
+        
+        return Response(
+            {
+                'error': True,
+                'message': 'Password change failed.',
+                'details': serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    @action(
+        detail=True, 
+        methods=['post'], 
+        permission_classes=[permissions.IsAuthenticated, IsAdminOnly]
+    )
+    def lock_account(self, request, pk=None):
+        """Lock user account (admin only)."""
+        user = self.get_object()
+        duration = request.data.get('duration_minutes', 30)
+        
+        user.lock_account(duration)
+        
+        logger.warning(
+            f"Account locked by admin: {user.username}",
+            extra={
+                'locked_user_id': user.id,
+                'admin_user_id': request.user.id,
+                'duration_minutes': duration,
+            }
+        )
+        
+        return Response({
+            'success': True,
+            'message': f'Account locked for {duration} minutes.'
+        })
+    
+    @action(
+        detail=True, 
+        methods=['post'], 
+        permission_classes=[permissions.IsAuthenticated, IsAdminOnly]
+    )
+    def unlock_account(self, request, pk=None):
+        """Unlock user account (admin only)."""
+        user = self.get_object()
+        user.unlock_account()
+        
+        logger.info(
+            f"Account unlocked by admin: {user.username}",
+            extra={
+                'unlocked_user_id': user.id,
+                'admin_user_id': request.user.id,
+            }
+        )
+        
+        return Response({
+            'success': True,
+            'message': 'Account unlocked successfully.'
+        })
+    
+    @action(
+        detail=True, 
+        methods=['post'], 
+        permission_classes=[permissions.IsAuthenticated, IsAdminOnly]
+    )
+    def force_password_change(self, request, pk=None):
+        """Force user to change password on next login."""
+        user = self.get_object()
+        user.must_change_password = True
+        user.save(update_fields=['must_change_password'])
+        
+        logger.info(
+            f"Forced password change for user: {user.username}",
+            extra={
+                'target_user_id': user.id,
+                'admin_user_id': request.user.id,
+            }
+        )
+        
+        return Response({
+            'success': True,
+            'message': 'User will be required to change password on next login.'
+        })
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
-    """Custom login view that returns tokens and user data"""
-    username = request.data.get('username')
-    password = request.data.get('password')
+    """Enhanced secure login view."""
     
-    if not username or not password:
+    # Rate limiting check
+    client_ip = get_client_ip(request)
+    rate_limit_key = f"login_attempts:{client_ip}"
+    attempts = cache.get(rate_limit_key, 0)
+    
+    if attempts >= 10:  # 10 attempts per hour from same IP
+        logger.warning(
+            f"Login rate limit exceeded from IP: {client_ip}",
+            extra={'ip': client_ip}
+        )
         return Response(
-            {'detail': 'Username and password are required'},
-            status=status.HTTP_400_BAD_REQUEST
+            {
+                'error': True,
+                'message': 'Too many login attempts. Please try again later.',
+                'status_code': 429
+            },
+            status=status.HTTP_429_TOO_MANY_REQUESTS
         )
     
-    user = authenticate(username=username, password=password)
+    serializer = LoginSerializer(
+        data=request.data,
+        context={'request': request}
+    )
     
-    if user is None:
-        return Response(
-            {'detail': 'Invalid credentials'},
-            status=status.HTTP_401_UNAUTHORIZED
+    if serializer.is_valid():
+        user = serializer.validated_data['user']
+        
+        # Generate tokens
+        refresh = RefreshToken.for_user(user)
+        
+        # Update last login
+        user.last_login = timezone.now()
+        user.save(update_fields=['last_login'])
+        
+        # Reset rate limiting on successful login
+        cache.delete(rate_limit_key)
+        
+        # Log successful login
+        logger.info(
+            f"Successful login: {user.username}",
+            extra={
+                'user_id': user.id,
+                'ip': client_ip,
+                'user_agent': request.META.get('HTTP_USER_AGENT', ''),
+            }
         )
+        
+        # Serialize user data
+        user_serializer = UserSerializer(user)
+        
+        return Response({
+            'success': True,
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': user_serializer.data
+        })
     
-    # Generate tokens
-    refresh = RefreshToken.for_user(user)
+    # Increment rate limiting on failed login
+    cache.set(rate_limit_key, attempts + 1, 3600)  # 1 hour timeout
     
-    # Serialize user data
-    user_serializer = UserSerializer(user)
+    # Log failed login attempt
+    username = request.data.get('username', '')
+    logger.warning(
+        f"Failed login attempt for username: {username}",
+        extra={
+            'username': username,
+            'ip': client_ip,
+            'errors': serializer.errors,
+        }
+    )
     
-    return Response({
-        'access': str(refresh.access_token),
-        'refresh': str(refresh),
-        'user': user_serializer.data
-    })
+    return Response(
+        {
+            'error': True,
+            'message': 'Login failed.',
+            'details': serializer.errors
+        },
+        status=status.HTTP_401_UNAUTHORIZED
+    )
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def parent_signup_view(request):
-    """Parent signup view that links parent to student using student ID or full name"""
-    from apps.students.models import Student
-    from django.db.models import Q
+    """Enhanced secure parent signup view."""
     
-    username = request.data.get('username')
-    email = request.data.get('email')
-    password = request.data.get('password')
-    full_name = request.data.get('full_name')
-    student_identifier = request.data.get('student_identifier')  # Can be ID or full name
+    # Rate limiting for signups
+    client_ip = get_client_ip(request)
+    rate_limit_key = f"signup_attempts:{client_ip}"
+    attempts = cache.get(rate_limit_key, 0)
     
-    # Validate required fields
-    if not all([username, email, password, full_name, student_identifier]):
+    if attempts >= 5:  # 5 signup attempts per hour from same IP
         return Response(
-            {'detail': 'All fields are required'},
-            status=status.HTTP_400_BAD_REQUEST
+            {
+                'error': True,
+                'message': 'Too many signup attempts. Please try again later.',
+                'status_code': 429
+            },
+            status=status.HTTP_429_TOO_MANY_REQUESTS
         )
     
-    # Check if username already exists
-    if User.objects.filter(username=username).exists():
+    serializer = ParentSignupSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        try:
+            user = serializer.save()
+            
+            # Reset rate limiting on successful signup
+            cache.delete(rate_limit_key)
+            
+            # Log successful signup
+            logger.info(
+                f"New parent signup: {user.username}",
+                extra={
+                    'user_id': user.id,
+                    'ip': client_ip,
+                }
+            )
+            
+            # Generate tokens for immediate login
+            refresh = RefreshToken.for_user(user)
+            user_serializer = UserSerializer(user)
+            
+            return Response({
+                'success': True,
+                'message': 'Parent account created successfully.',
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'user': user_serializer.data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(
+                f"Parent signup error: {str(e)}",
+                extra={'ip': client_ip},
+                exc_info=True
+            )
+            return Response(
+                {
+                    'error': True,
+                    'message': 'Signup failed. Please try again.',
+                    'status_code': 500
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    # Increment rate limiting on failed signup
+    cache.set(rate_limit_key, attempts + 1, 3600)  # 1 hour timeout
+    
+    return Response(
+        {
+            'error': True,
+            'message': 'Signup failed.',
+            'details': serializer.errors
+        },
+        status=status.HTTP_400_BAD_REQUEST
+    )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset_request_view(request):
+    """Request password reset."""
+    
+    # Rate limiting for password reset requests
+    client_ip = get_client_ip(request)
+    rate_limit_key = f"password_reset:{client_ip}"
+    attempts = cache.get(rate_limit_key, 0)
+    
+    if attempts >= 3:  # 3 password reset requests per hour
         return Response(
-            {'detail': 'Username already exists'},
-            status=status.HTTP_400_BAD_REQUEST
+            {
+                'error': True,
+                'message': 'Too many password reset requests. Please try again later.',
+                'status_code': 429
+            },
+            status=status.HTTP_429_TOO_MANY_REQUESTS
         )
     
-    # Check if email already exists
-    if User.objects.filter(email=email).exists():
-        return Response(
-            {'detail': 'Email already exists'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    serializer = PasswordResetRequestSerializer(data=request.data)
     
-    # Find student by ID or full name
-    student = None
+    if serializer.is_valid():
+        email = serializer.validated_data['email']
+        
+        # Increment rate limiting
+        cache.set(rate_limit_key, attempts + 1, 3600)
+        
+        try:
+            user = User.objects.get(email=email, is_active=True)
+            
+            # TODO: Implement actual password reset email sending
+            # For now, just log the request
+            logger.info(
+                f"Password reset requested for: {email}",
+                extra={
+                    'user_id': user.id,
+                    'ip': client_ip,
+                }
+            )
+            
+        except User.DoesNotExist:
+            # Don't reveal that email doesn't exist
+            logger.warning(
+                f"Password reset requested for non-existent email: {email}",
+                extra={'ip': client_ip}
+            )
+        
+        # Always return success to prevent email enumeration
+        return Response({
+            'success': True,
+            'message': 'If the email exists, a password reset link has been sent.'
+        })
+    
+    return Response(
+        {
+            'error': True,
+            'message': 'Invalid request.',
+            'details': serializer.errors
+        },
+        status=status.HTTP_400_BAD_REQUEST
+    )
+
+
+def get_client_ip(request):
+    """Get the client IP address from request."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
     
     # Try to find by ID first (if it's numeric)
     if student_identifier.isdigit():

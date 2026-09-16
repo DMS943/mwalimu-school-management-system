@@ -1,0 +1,269 @@
+# Prometheus Alert Rules for Mwalimu School Management System
+# Production monitoring and alerting
+
+groups:
+  - name: application_alerts
+    rules:
+      # Application Health Alerts
+      - alert: ApplicationDown
+        expr: up{job="school-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "School Backend Service Down"
+          description: "Backend service {{ $labels.instance }} has been down for more than 1 minute"
+
+      - alert: HighErrorRate
+        expr: rate(django_http_responses_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Error Rate Detected"
+          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, rate(django_http_request_duration_seconds_bucket[5m])) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow Response Time"
+          description: "95th percentile response time is {{ $value }}s on {{ $labels.instance }}"
+
+      # Database Health Alerts
+      - alert: DatabaseHealthLow
+        expr: database_health_score < 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database Health Score Low"
+          description: "Database health score is {{ $value }} on {{ $labels.instance }}"
+
+      - alert: DatabaseConnectionsHigh
+        expr: database_connections_active > 150
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Database Connections"
+          description: "Active database connections: {{ $value }} on {{ $labels.instance }}"
+
+      - alert: SlowQueries
+        expr: database_slow_queries > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow Database Queries Detected"
+          description: "{{ $value }} slow queries detected on {{ $labels.instance }}"
+
+  - name: infrastructure_alerts
+    rules:
+      # System Resource Alerts
+      - alert: HighCPUUsage
+        expr: system_cpu_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU Usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: system_memory_percent > 90
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Memory Usage"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: LowDiskSpace
+        expr: system_disk_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low Disk Space"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: CriticalDiskSpace
+        expr: system_disk_percent > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical Disk Space"
+          description: "Disk usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # Container/Pod Alerts
+      - alert: ContainerRestarting
+        expr: rate(container_restart_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container Restarting"
+          description: "Container {{ $labels.container }} is restarting frequently"
+
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pod Crash Looping"
+          description: "Pod {{ $labels.pod }} is crash looping in namespace {{ $labels.namespace }}"
+
+  - name: redis_alerts
+    rules:
+      # Redis Health Alerts
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis Instance Down"
+          description: "Redis instance {{ $labels.instance }} is down"
+
+      - alert: RedisHighMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis High Memory Usage"
+          description: "Redis memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: RedisSlowQueries
+        expr: redis_slowlog_length > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis Slow Queries"
+          description: "{{ $value }} slow queries in Redis on {{ $labels.instance }}"
+
+  - name: nginx_alerts
+    rules:
+      # Nginx/Load Balancer Alerts
+      - alert: NginxDown
+        expr: nginx_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nginx Load Balancer Down"
+          description: "Nginx instance {{ $labels.instance }} is down"
+
+      - alert: HighRequestRate
+        expr: rate(nginx_http_requests_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Request Rate"
+          description: "Request rate is {{ $value }} req/s on {{ $labels.instance }}"
+
+      - alert: SSLCertificateExpiring
+        expr: (ssl_certificate_expiry_seconds - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL Certificate Expiring Soon"
+          description: "SSL certificate expires in {{ $value }} days for {{ $labels.instance }}"
+
+      - alert: SSL CertificateExpired
+        expr: ssl_certificate_expiry_seconds < time()
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SSL Certificate Expired"
+          description: "SSL certificate has expired for {{ $labels.instance }}"
+
+  - name: security_alerts
+    rules:
+      # Security-related Alerts
+      - alert: HighFailedLoginRate
+        expr: rate(django_auth_failed_logins_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Failed Login Rate"
+          description: "Failed login rate is {{ $value }} per second on {{ $labels.instance }}"
+
+      - alert: AccountLockoutThresholdReached
+        expr: django_auth_locked_accounts_total > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Multiple Account Lockouts"
+          description: "{{ $value }} accounts are currently locked on {{ $labels.instance }}"
+
+      - alert: SecurityAuditFailure
+        expr: django_security_audit_failures_total > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Security Audit Failures"
+          description: "{{ $value }} security audit failures detected on {{ $labels.instance }}"
+
+  - name: backup_alerts
+    rules:
+      # Backup and Data Protection Alerts
+      - alert: BackupFailed
+        expr: backup_last_success_timestamp < time() - 86400  # 24 hours
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup Failed"
+          description: "Database backup has not completed successfully in the last 24 hours"
+
+      - alert: BackupSizeUnusual
+        expr: backup_size_bytes < (backup_avg_size_bytes * 0.5) or backup_size_bytes > (backup_avg_size_bytes * 2)
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual Backup Size"
+          description: "Backup size ({{ $value | humanizeBytes }}) is significantly different from average"
+
+  - name: business_logic_alerts
+    rules:
+      # Business Logic Alerts
+      - alert: LowStudentEngagement
+        expr: avg_over_time(active_students_last_hour[24h]) < 10
+        for: 2h
+        labels:
+          severity: info
+        annotations:
+          summary: "Low Student Engagement"
+          description: "Average active students over the last 24 hours is {{ $value }}"
+
+      - alert: ExcessiveDataUsage
+        expr: rate(django_db_queries_total[1h]) > 1000
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Excessive Database Usage"
+          description: "Database query rate is {{ $value }} queries per second over the last hour"
+
+      - alert: ReportGenerationFailing
+        expr: rate(report_generation_failures_total[1h]) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Report Generation Failures"
+          description: "Report generation is failing at {{ $value }} per second rate"

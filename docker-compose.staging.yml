@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: school_backend_staging
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    environment:
+      - ENVIRONMENT=staging
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_NAME=${SUPABASE_DB_NAME}
+      - DATABASE_USER=${SUPABASE_DB_USER}
+      - DATABASE_PASSWORD=${SUPABASE_DB_PASSWORD}
+      - DATABASE_HOST=${SUPABASE_DB_HOST}
+      - DATABASE_PORT=${SUPABASE_DB_PORT}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-1.0}
+      - RELEASE_VERSION=${RELEASE_VERSION:-staging}
+    networks:
+      - school_network
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: school_frontend_staging
+    volumes:
+      - frontend_build:/app/dist
+    networks:
+      - school_network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: school_nginx_staging
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.staging.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - static_volume:/var/www/static
+      - media_volume:/var/www/media
+      - frontend_build:/var/www/html
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - school_network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: school_redis_staging
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - school_network
+    restart: unless-stopped
+
+volumes:
+  static_volume:
+  media_volume:
+  frontend_build:
+  redis_data:
+
+networks:
+  school_network:
+    driver: bridge

@@ -1,0 +1,221 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: mwalimu-school
+  labels:
+    app: backend
+    tier: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: backend
+      tier: api
+  template:
+    metadata:
+      labels:
+        app: backend
+        tier: api
+    spec:
+      containers:
+      - name: backend
+        image: registry.gitlab.com/yourproject/mwalimu-school/backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: school-secrets
+              key: secret-key
+        - name: DATABASE_NAME
+          valueFrom:
+            secretKeyRef:
+              name: school-secrets
+              key: database-name
+        - name: DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: school-secrets
+              key: database-user
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: school-secrets
+              key: database-password
+        - name: DATABASE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: school-secrets
+              key: database-host
+        - name: DATABASE_PORT
+          value: "5432"
+        - name: SENTRY_DSN
+          valueFrom:
+            secretKeyRef:
+              name: school-secrets
+              key: sentry-dsn
+              optional: true
+        envFrom:
+        - configMapRef:
+            name: school-config
+        command:
+        - gunicorn
+        - config.wsgi:application
+        - --bind
+        - 0.0.0.0:8000
+        - --workers
+        - "4"
+        - --worker-class
+        - gevent
+        - --worker-connections
+        - "1000"
+        - --max-requests
+        - "1000"
+        - --max-requests-jitter
+        - "100"
+        - --timeout
+        - "30"
+        - --keep-alive
+        - "5"
+        - --access-logfile
+        - "-"
+        - --error-logfile
+        - "-"
+        - --log-level
+        - info
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /monitoring/alive/
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /monitoring/ready/
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /monitoring/health/
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 6
+        volumeMounts:
+        - name: static-volume
+          mountPath: /app/staticfiles
+        - name: media-volume
+          mountPath: /app/media
+        - name: backup-volume
+          mountPath: /opt/backups
+        - name: logs-volume
+          mountPath: /var/log/django
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: static-volume
+        persistentVolumeClaim:
+          claimName: static-pvc
+      - name: media-volume
+        persistentVolumeClaim:
+          claimName: media-pvc
+      - name: backup-volume
+        persistentVolumeClaim:
+          claimName: backup-pvc
+      - name: logs-volume
+        emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 60
+      serviceAccountName: school-service-account
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: mwalimu-school
+  labels:
+    app: backend
+    tier: api
+spec:
+  selector:
+    app: backend
+    tier: api
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+  sessionAffinity: None
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: mwalimu-school
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-deployment
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max

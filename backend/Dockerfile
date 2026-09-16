@@ -28,7 +28,7 @@ COPY . .
 # Set executable permissions for entrypoint and create directories
 RUN sed -i 's/\r$//' /app/entrypoint.sh \
     && chmod 755 /app/entrypoint.sh \
-    && mkdir -p /app/staticfiles /app/media \
+    && mkdir -p /app/staticfiles /app/media /opt/backups /var/log/django \
     && ls -la /app/entrypoint.sh \
     && echo "=== Final entrypoint verification ===" \
     && head -n 3 /app/entrypoint.sh \

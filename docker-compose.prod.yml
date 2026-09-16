@@ -1,35 +1,213 @@
 version: '3.8'
 
 services:
-  backend:
+  # Nginx Load Balancer with SSL Termination
+  nginx:
+    image: nginx:alpine
+    container_name: school_nginx_lb
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/ssl/nginx:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+      - static_volume:/var/www/static:ro
+      - media_volume:/var/www/media:ro
+      - frontend_build:/var/www/html:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - backend_1
+      - backend_2
+      - frontend
+      - redis
+    networks:
+      - school_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # Backend Instance 1
+  backend_1:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: school_backend
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    container_name: school_backend_1
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --worker-class gevent --worker-connections 1000 --max-requests 1000 --max-requests-jitter 100 --timeout 30 --keep-alive 5
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+      - ./backups:/opt/backups
+      - ./logs:/var/log/django
     environment:
+      - ENVIRONMENT=production
       - DEBUG=False
       - SECRET_KEY=${SECRET_KEY}
       - DATABASE_NAME=${SUPABASE_DB_NAME}
       - DATABASE_USER=${SUPABASE_DB_USER}
       - DATABASE_PASSWORD=${SUPABASE_DB_PASSWORD}
       - DATABASE_HOST=${SUPABASE_DB_HOST}
-      - DATABASE_PORT=${SUPABASE_DB_PORT}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
-      # Pass CI environment variables to container
+      - DATABASE_PORT=${SUPABASE_DB_PORT:-5432}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      - REDIS_URL=redis://redis:6379/0
+      - SENTRY_DSN=${SENTRY_DSN:-}
       - CI=true
       - GITLAB_CI=true
-      - CI_JOB_ID=${CI_JOB_ID:-ci-job}
-      - CI_PIPELINE_ID=${CI_PIPELINE_ID:-ci-pipeline}
+      - CI_JOB_ID=${CI_JOB_ID:-production-deploy}
+      - CI_PIPELINE_ID=${CI_PIPELINE_ID:-production-pipeline}
+      - CI_COMMIT_SHA=${CI_COMMIT_SHA:-latest}
+      # Backup configuration
+      - BACKUP_DIR=/opt/backups
+      - BACKUP_S3_ENABLED=${BACKUP_S3_ENABLED:-false}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-90}
+      - S3_BACKUP_BUCKET=${S3_BACKUP_BUCKET:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      # Performance settings
+      - GUNICORN_WORKERS=4
+      - GUNICORN_WORKER_CLASS=gevent
+      - GUNICORN_WORKER_CONNECTIONS=1000
     networks:
       - school_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/monitoring/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
 
+  # Backend Instance 2
+  backend_2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: school_backend_2
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --worker-class gevent --worker-connections 1000 --max-requests 1000 --max-requests-jitter 100 --timeout 30 --keep-alive 5
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./backups:/opt/backups
+      - ./logs:/var/log/django
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_NAME=${SUPABASE_DB_NAME}
+      - DATABASE_USER=${SUPABASE_DB_USER}
+      - DATABASE_PASSWORD=${SUPABASE_DB_PASSWORD}
+      - DATABASE_HOST=${SUPABASE_DB_HOST}
+      - DATABASE_PORT=${SUPABASE_DB_PORT:-5432}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      - REDIS_URL=redis://redis:6379/0
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - CI=true
+      - GITLAB_CI=true
+      - CI_JOB_ID=${CI_JOB_ID:-production-deploy}
+      - CI_PIPELINE_ID=${CI_PIPELINE_ID:-production-pipeline}
+      - CI_COMMIT_SHA=${CI_COMMIT_SHA:-latest}
+      # Backup configuration
+      - BACKUP_DIR=/opt/backups
+      - BACKUP_S3_ENABLED=${BACKUP_S3_ENABLED:-false}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-90}
+      - S3_BACKUP_BUCKET=${S3_BACKUP_BUCKET:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      # Performance settings
+      - GUNICORN_WORKERS=4
+      - GUNICORN_WORKER_CLASS=gevent
+      - GUNICORN_WORKER_CONNECTIONS=1000
+    networks:
+      - school_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/monitoring/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+  # Backend Instance 3 (Backup/Standby)
+  backend_3:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: school_backend_3
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --worker-class gevent --worker-connections 500 --max-requests 1000 --max-requests-jitter 100 --timeout 30 --keep-alive 5
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - ./backups:/opt/backups
+      - ./logs:/var/log/django
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_NAME=${SUPABASE_DB_NAME}
+      - DATABASE_USER=${SUPABASE_DB_USER}
+      - DATABASE_PASSWORD=${SUPABASE_DB_PASSWORD}
+      - DATABASE_HOST=${SUPABASE_DB_HOST}
+      - DATABASE_PORT=${SUPABASE_DB_PORT:-5432}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      - REDIS_URL=redis://redis:6379/0
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - CI=true
+      - GITLAB_CI=true
+      - CI_JOB_ID=${CI_JOB_ID:-production-deploy}
+      - CI_PIPELINE_ID=${CI_PIPELINE_ID:-production-pipeline}
+      - CI_COMMIT_SHA=${CI_COMMIT_SHA:-latest}
+      # Backup configuration
+      - BACKUP_DIR=/opt/backups
+      - BACKUP_S3_ENABLED=${BACKUP_S3_ENABLED:-false}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-90}
+      - S3_BACKUP_BUCKET=${S3_BACKUP_BUCKET:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-us-east-1}
+      # Performance settings (reduced for backup instance)
+      - GUNICORN_WORKERS=2
+      - GUNICORN_WORKER_CLASS=gevent
+      - GUNICORN_WORKER_CONNECTIONS=500
+    networks:
+      - school_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/monitoring/health/"]
+      interval: 60s
+      timeout: 15s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+          cpus: '0.75'
+
+  # Frontend
   frontend:
     build:
       context: .
@@ -40,31 +218,129 @@ services:
     networks:
       - school_network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
 
-  nginx:
-    image: nginx:alpine
-    container_name: school_nginx
-    ports:
-      - "80:80"
-      - "443:443"
+  # Redis for session management and caching
+  redis:
+    image: redis:7-alpine
+    container_name: school_redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --tcp-keepalive 60 --timeout 300
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/ssl:/etc/nginx/ssl
-      - static_volume:/var/www/static
-      - media_volume:/var/www/media
-      - frontend_build:/var/www/html
-    depends_on:
-      - backend
-      - frontend
+      - redis_data:/data
+      - ./redis/redis.conf:/etc/redis/redis.conf:ro
+    ports:
+      - "127.0.0.1:6379:6379"  # Only accessible locally
     networks:
       - school_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # Certbot for SSL certificate management
+  certbot:
+    image: certbot/certbot:latest
+    container_name: school_certbot
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    command: /bin/true  # Do nothing by default
+    networks:
+      - school_network
+    profiles:
+      - ssl-setup  # Only start when needed
+
+  # Log aggregation and monitoring
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: school_filebeat
+    user: root
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - nginx_logs:/var/log/nginx:ro
+      - ./logs:/var/log/django:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: filebeat -e -strict.perms=false
+    networks:
+      - school_network
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    profiles:
+      - monitoring
+
+  # Performance monitoring
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: school_cadvisor
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - school_network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Node exporter for system metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: school_node_exporter
+    ports:
+      - "127.0.0.1:9100:9100"
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - '/:/host:ro,rslave'
+    networks:
+      - school_network
+    restart: unless-stopped
+    profiles:
+      - monitoring
 
 volumes:
   static_volume:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./static
   media_volume:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./media
   frontend_build:
+    driver: local
+  redis_data:
+    driver: local
+  nginx_logs:
+    driver: local
 
 networks:
   school_network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
