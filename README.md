@@ -59,7 +59,8 @@ A comprehensive school management system built with Django REST Framework backen
 
 ### DevOps & Deployment
 - **Docker** - Containerization
-- **GitLab CI/CD** - Continuous integration and deployment
+- **GitHub Actions** - Continuous integration and deployment
+- **GitHub Container Registry** - Docker image storage
 - **Nginx** - Web server and reverse proxy
 
 ## 📋 Prerequisites
@@ -73,8 +74,8 @@ A comprehensive school management system built with Django REST Framework backen
 
 ### 1. Clone the Repository
 ```bash
-git clone <repository-url>
-cd mwalimu-school-system
+git clone https://github.com/DMS943/mwalimu-school-management-system.git
+cd mwalimu-school-management-system
 ```
 
 ### 2. Backend Setup
@@ -226,15 +227,34 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ## 🚀 CI/CD Pipeline
 
-The project includes GitLab CI/CD configuration with:
-- **Test Stage**: Run backend tests
-- **Build Stage**: Build Docker images
-- **Deploy Stage**: Deploy to staging/production
+The project includes a comprehensive GitHub Actions CI/CD pipeline with:
 
-Configure your GitLab variables:
-- `DEPLOY_SERVER`: Server IP address
-- `DEPLOY_USER`: SSH username
-- `SSH_PRIVATE_KEY`: SSH private key
+### Pipeline Stages
+- **🔍 Validation**: Configuration and dependency validation
+- **🧪 Backend Tests**: Django test suite with PostgreSQL and Redis
+- **🎨 Frontend Tests**: React/TypeScript testing and building
+- **📝 Code Quality**: Linting, formatting, and code analysis
+- **🛡️ Security Scanning**: Dependency vulnerability scans and static analysis
+- **🐳 Docker Build**: Multi-stage Docker image builds with caching
+- **🚀 Deployment**: Automated staging and production deployments
+- **📊 Monitoring**: Post-deployment health checks and monitoring
+
+### GitHub Actions Features
+- **Visual Status Indicators**: Emoji-enhanced job names and status reporting
+- **Parallel Execution**: Jobs run concurrently for faster feedback
+- **Comprehensive Caching**: Dependency and build artifact caching
+- **Security Scanning**: Automated vulnerability detection
+- **Multi-environment Support**: Separate staging and production workflows
+
+### Environment Configuration
+The pipeline supports multiple environments with automatic deployment:
+- **Staging**: Deploys from `develop` branch
+- **Production**: Deploys from `main` branch
+
+### Monitoring GitHub Actions
+- Visit the [Actions tab](https://github.com/DMS943/mwalimu-school-management-system/actions) to view workflow runs
+- Check the status badges in the README for current build status
+- Review detailed logs for debugging failed builds
 
 ## 📊 API Documentation
 
@@ -354,10 +374,66 @@ This project is licensed under the MIT License.
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
+We welcome contributions to the Mwalimu School Management System! Here's how you can get involved:
+
+### Getting Started
+1. **Fork the repository** on GitHub
+2. **Clone your fork** locally:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/mwalimu-school-management-system.git
+   cd mwalimu-school-management-system
+   ```
+3. **Add the upstream remote**:
+   ```bash
+   git remote add upstream https://github.com/DMS943/mwalimu-school-management-system.git
+   ```
+
+### Development Workflow
+1. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+2. **Make your changes** following our coding standards
+3. **Run tests** to ensure everything works:
+   ```bash
+   # Backend tests
+   cd backend && python manage.py test
+   
+   # Frontend tests
+   npm run test
+   
+   # Linting and formatting
+   npm run lint
+   npm run format:check
+   ```
+4. **Commit your changes** with descriptive messages:
+   ```bash
+   git commit -m "✨ Add feature: description of your changes"
+   ```
+5. **Push to your fork**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+6. **Create a Pull Request** on GitHub
+
+### Pull Request Guidelines
+- **Clear Description**: Explain what changes you've made and why
+- **Link Issues**: Reference any related GitHub issues
+- **Tests**: Ensure all tests pass and add new tests for new features
+- **Documentation**: Update documentation if needed
+- **Code Quality**: Follow existing code style and conventions
+
+### Code Standards
+- **Backend**: Follow Django best practices and PEP 8
+- **Frontend**: Use TypeScript, follow React best practices
+- **Commits**: Use conventional commit messages with emojis
+- **Testing**: Maintain or improve test coverage
+
+### Reporting Issues
+- Use the [GitHub Issues](https://github.com/DMS943/mwalimu-school-management-system/issues) page
+- Provide detailed reproduction steps
+- Include environment details (OS, Python version, Node version)
+- Add relevant logs or error messages
 5. Submit a pull request
 
 ## 📞 Support
@@ -377,5 +453,21 @@ To update the system:
 5. Restart services
 
 ---
+
+## 📊 Repository Information
+
+- **GitHub Repository**: https://github.com/DMS943/mwalimu-school-management-system
+- **Issues & Bug Reports**: [GitHub Issues](https://github.com/DMS943/mwalimu-school-management-system/issues)
+- **CI/CD Pipeline**: [GitHub Actions](https://github.com/DMS943/mwalimu-school-management-system/actions)
+- **License**: MIT License
+- **Latest Release**: Check [Releases](https://github.com/DMS943/mwalimu-school-management-system/releases)
+
+### Migration from GitLab
+This project was successfully migrated from GitLab to GitHub with enhanced CI/CD features:
+- ✅ Enhanced GitHub Actions pipeline with visual indicators
+- ✅ Multi-stage deployment workflows (staging/production)
+- ✅ Comprehensive security scanning and code quality checks
+- ✅ Docker image builds with GitHub Container Registry
+- ✅ Automated dependency vulnerability scanning
 
 **Built with ❤️ for Zambian educational institutions**
