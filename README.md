@@ -1,5 +1,9 @@
 # Mwalimu School Management System
 
+![CI/CD Pipeline](https://github.com/DMS943/mwalimu-school-management-system/actions/workflows/ci.yml/badge.svg)
+![GitHub last commit](https://img.shields.io/github/last-commit/DMS943/mwalimu-school-management-system)
+![GitHub issues](https://img.shields.io/github/issues/DMS943/mwalimu-school-management-system)
+
 A comprehensive school management system built with Django REST Framework backend and React TypeScript frontend. This system provides role-based access for administrators, teachers, students, and parents with features for academic management, reporting, and communication.
 
 *Mwalimu* means "teacher" in Swahili and represents our commitment to empowering educators and enhancing learning experiences across Zambian schools.
