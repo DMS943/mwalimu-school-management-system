@@ -19,4 +19,17 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     exclude: ['backend'],
   },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    minify: mode === 'production' ? 'esbuild' : false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+        },
+      },
+    },
+  },
 }));
