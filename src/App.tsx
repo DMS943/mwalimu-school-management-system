@@ -4,26 +4,26 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import ParentSignup from "./pages/ParentSignup";
+import Index from "./components/pages/Index";
+import NotFound from "./components/pages/NotFound";
+import ParentSignup from "./components/pages/ParentSignup";
 
 // Teacher pages
-import TeacherClasses from "./pages/teacher/Classes";
-import TeacherGrades from "./pages/teacher/Grades";
-import TeacherAttendance from "./pages/teacher/Attendance";
-import TeacherStudents from "./pages/teacher/Students";
-import TeacherReports from "./pages/teacher/Reports";
-import TeacherSchedule from "./pages/teacher/Schedule";
+import TeacherClasses from "./components/pages/teacher/Classes";
+import TeacherGrades from "./components/pages/teacher/Grades";
+import TeacherAttendance from "./components/pages/teacher/Attendance";
+import TeacherStudents from "./components/pages/teacher/Students";
+import TeacherReports from "./components/pages/teacher/Reports";
+import TeacherSchedule from "./components/pages/teacher/Schedule";
 
 // Admin pages
-import AdminUsers from "./pages/admin/Users";
-import AdminClasses from "./pages/admin/Classes";
-import AdminStudents from "./pages/admin/Students";
-import AdminReports from "./pages/admin/Reports";
-import AdminSettings from "./pages/admin/Settings";
-import AdminTerms from "./pages/admin/Terms";
-import AcademicSettings from "./pages/admin/AcademicSettings";
+import AdminUsers from "./components/pages/admin/Users";
+import AdminClasses from "./components/pages/admin/Classes";
+import AdminStudents from "./components/pages/admin/Students";
+import AdminReports from "./components/pages/admin/Reports";
+import AdminSettings from "./components/pages/admin/Settings";
+import AdminTerms from "./components/pages/admin/Terms";
+import AcademicSettings from "./components/pages/admin/AcademicSettings";
 
 // Create a stable query client instance
 const queryClient = new QueryClient({
