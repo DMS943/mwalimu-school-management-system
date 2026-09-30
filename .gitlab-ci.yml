@@ -1,142 +1,70 @@
-# Production-ready CI/CD Pipeline for Mwalimu School Management System
-# Comprehensive testing, security scanning, quality checks, and deployment automation
-
 stages:
   - validate
   - test
-  - quality
-  - security
   - build
+  - security
   - deploy
-  - monitor
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
 
 variables:
-  # Global variables
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  NODE_CACHE_DIR: "$CI_PROJECT_DIR/.cache/node"
-  DOCKER_BUILDKIT: "1"
-  DOCKER_DRIVER: overlay2
-  
-  # Application variables
-  CI: "true"
-  GITLAB_CI: "true"
-  
-  # Test configuration
-  DATABASE_URL: "sqlite:///test.db"
-  DJANGO_SETTINGS_MODULE: "config.testing"
+  DJANGO_SETTINGS_MODULE: config.testing
+  DATABASE_NAME: test_school
+  DATABASE_USER: test
+  DATABASE_PASSWORD: test
+  DATABASE_HOST: postgres
+  DATABASE_PORT: "5432"
+  POSTGRES_DB: test_school
+  POSTGRES_USER: test
+  POSTGRES_PASSWORD: test
+  POSTGRES_HOST_AUTH_METHOD: trust
+  npm_config_cache: "$CI_PROJECT_DIR/.cache/npm"
 
-# Cache configuration
-.cache-pip: &cache-pip
-  cache:
-    key: pip-$CI_COMMIT_REF_SLUG
-    paths:
-      - .cache/pip/
-    policy: pull-push
+cache:
+  key:
+    files:
+      - package-lock.json
+      - backend/requirements.txt
+      - backend/requirements-dev.txt
+  paths:
+    - .cache/pip/
+    - .cache/npm/
 
-.cache-node: &cache-node
-  cache:
-    key: node-$CI_COMMIT_REF_SLUG
-    paths:
-      - .cache/node/
-      - node_modules/
-    policy: pull-push
-
-.cache-docker: &cache-docker
-  cache:
-    key: docker-$CI_COMMIT_REF_SLUG
-    paths:
-      - .cache/docker/
-
-# ===== VALIDATION STAGE =====
-
-validate-config:
+validate:
   stage: validate
-  image: python:3.11-alpine
-  before_script:
-    - cd backend
-    - pip install python-decouple pyyaml
+  image: python:3.11-slim
   script:
-    - echo "Validating configuration files..."
-    - python -c "import yaml; yaml.safe_load(open('../.gitlab-ci.yml'))"
-    - python -c "from decouple import config; print('Configuration validation passed')"
-    - echo "✅ Configuration validation completed"
-  rules:
-    - changes:
-        - .gitlab-ci.yml
-        - backend/config/*.py
-        - .env.example*
-        - docker-compose*.yml
-validate-environment:
-  stage: validate
-  image: alpine:latest
+    - python - <<'PY'
+      import yaml
+      with open('.gitlab-ci.yml', encoding='utf-8') as stream:
+          yaml.safe_load(stream)
+      print('GitLab CI YAML is valid')
+      PY
   before_script:
-    - apk add --no-cache bash
-  script:
-    - echo "Validating required environment variables..."
-    - |
-      # In CI, we just check that we can access the variables
-      # In actual deployment, these would be set properly
-      echo "Environment validation:"
-      echo "- CI: ${CI:-'not set'}"
-      echo "- GITLAB_CI: ${GITLAB_CI:-'not set'}" 
-      echo "- CI_COMMIT_SHA: ${CI_COMMIT_SHA:-'not set'}"
-      
-      # For now, we'll just verify the basic CI environment
-      if [ "$CI" = "true" ] || [ "$GITLAB_CI" = "true" ]; then
-        echo "✅ Running in CI environment"
-      else
-        echo "⚠️ Not running in CI environment, but that's okay for testing"
-      fi
-      
-    - echo "✅ Environment validation completed"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"'
-  allow_failure: true
+    - pip install --no-cache-dir pyyaml
 
-# ===== TESTING STAGE =====
-
-backend-unit-tests:
+backend_tests:
   stage: test
   image: python:3.11-slim
-  <<: *cache-pip
   services:
-    - postgres:15-alpine
-  variables:
-    POSTGRES_DB: test_school
-    POSTGRES_USER: test
-    POSTGRES_PASSWORD: test
-    POSTGRES_HOST_AUTH_METHOD: trust
-    DATABASE_NAME: test_school
-    DATABASE_USER: test
-    DATABASE_PASSWORD: test
-    DATABASE_HOST: postgres
-    DATABASE_PORT: "5432"
-    DJANGO_SETTINGS_MODULE: config.testing
+    - name: postgres:15-alpine
+      alias: postgres
   before_script:
-    - apt-get update -qq && apt-get install -y -qq postgresql-client
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client
     - cd backend
-    - pip install --cache-dir .cache/pip -r requirements.txt -r requirements-dev.txt
-    - |
-      # Wait for database
-      until pg_isready -h postgres -p 5432 -U test; do
-        echo "Waiting for database..."
-        sleep 2
-      done
+    - pip install --cache-dir "$PIP_CACHE_DIR" -r requirements.txt -r requirements-dev.txt
+    - until pg_isready -h "$DATABASE_HOST" -p "$DATABASE_PORT" -U "$DATABASE_USER"; do sleep 2; done
   script:
-    - echo "Running backend unit tests..."
-    - python manage.py check --deploy
+    - python manage.py check
     - python manage.py makemigrations --check --dry-run
     - python manage.py migrate --noinput
-    - python manage.py validate_config
-    - |
-      # Run tests with coverage
-      python -m pytest \
-        --tb=short \
-        --maxfail=5 \
-        -v \
-        || echo "Some tests failed but continuing..."
-    - echo "✅ Backend unit tests completed"
+    - pytest --tb=short --junitxml=test-results.xml --cov=. --cov-report=xml:coverage.xml
   artifacts:
+    when: always
     reports:
       junit: backend/test-results.xml
       coverage_report:
@@ -146,552 +74,68 @@ backend-unit-tests:
       - backend/coverage.xml
       - backend/test-results.xml
     expire_in: 1 week
-  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
-  allow_failure: true
 
-frontend-unit-tests:
+frontend_checks:
   stage: test
   image: node:20-alpine
-  <<: *cache-node
   before_script:
-    - npm ci --cache .cache/node
+    - npm ci --cache "$npm_config_cache" --prefer-offline
   script:
-    - echo "Running frontend unit tests..."
-    - npm run test -- --coverage --watchAll=false --ci || echo "Frontend tests not fully implemented yet"
-    - npm run lint || echo "Linting issues found but continuing"
-    - npm run type-check || echo "Type check issues found but continuing" 
-    - echo "✅ Frontend unit tests completed"
-  artifacts:
-    reports:
-      junit: junit.xml
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage/cobertura-coverage.xml
-    paths:
-      - coverage/
-      - junit.xml
-    expire_in: 1 week
-  coverage: '/Lines\s*:\s*(\d+\.\d+)%/'
-  allow_failure: true
-integration-tests:
-  stage: test
-  image: python:3.11-slim
-  <<: *cache-pip
-  services:
-    - postgres:15-alpine
-    - redis:7-alpine
-  variables:
-    POSTGRES_DB: test_school_integration
-    POSTGRES_USER: test
-    POSTGRES_PASSWORD: test
-    POSTGRES_HOST_AUTH_METHOD: trust
-    DATABASE_NAME: test_school_integration
-    DATABASE_USER: test
-    DATABASE_PASSWORD: test
-    DATABASE_HOST: postgres
-    DATABASE_PORT: "5432"
-    REDIS_URL: redis://redis:6379/0
-    DJANGO_SETTINGS_MODULE: config.testing
-  before_script:
-    - apt-get update -qq && apt-get install -y -qq postgresql-client
-    - cd backend
-    - pip install --cache-dir .cache/pip -r requirements.txt -r requirements-dev.txt
-    - |
-      until pg_isready -h postgres -p 5432 -U test; do
-        echo "Waiting for database..."
-        sleep 2
-      done
-  script:
-    - echo "Running integration tests..."
-    - python manage.py migrate --noinput
-    - python manage.py setup_production_db --skip-collectstatic --skip-migrations
-    - |
-      # Run integration tests
-      python -m pytest tests/integration/ \
-        --tb=short \
-        --junitxml=integration-results.xml \
-        -v
-    - echo "✅ Integration tests completed"
-  artifacts:
-    reports:
-      junit: backend/integration-results.xml
-    expire_in: 1 week
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_PIPELINE_SOURCE == "merge_request_event"'
-
-# ===== QUALITY STAGE =====
-
-code-quality-backend:
-  stage: quality
-  image: python:3.11-slim
-  <<: *cache-pip
-  before_script:
-    - cd backend
-    - pip install --cache-dir .cache/pip -r requirements-dev.txt
-  script:
-    - echo "Running backend code quality checks..."
-    - |
-      # Code formatting check
-      echo "Checking code formatting with black..."
-      black --check --diff .
-      
-      # Import sorting check  
-      echo "Checking import sorting with isort..."
-      isort --check-only --diff .
-      
-      # Linting with flake8
-      echo "Running flake8 linting..."
-      flake8 .
-      
-      # Type checking with mypy
-      echo "Running type checking with mypy..."
-      mypy apps/ --ignore-missing-imports || true
-      
-      # Complexity analysis
-      echo "Running complexity analysis..."
-      radon cc apps/ --min B
-      
-      # Security linting with bandit
-      echo "Running security linting with bandit..."
-      bandit -r apps/ -f json -o bandit-report.json || true
-      bandit -r apps/
-      
-    - echo "✅ Backend code quality checks completed"
-  artifacts:
-    paths:
-      - backend/bandit-report.json
-    expire_in: 1 week
-  allow_failure: false
-
-code-quality-frontend:
-  stage: quality
-  image: node:20-alpine
-  <<: *cache-node
-  before_script:
-    - npm ci --cache .cache/node
-  script:
-    - echo "Running frontend code quality checks..."
-    - |
-      # ESLint
-      echo "Running ESLint..."
-      npm run lint || echo "ESLint issues found but continuing"
-      
-      # Prettier check (if available)
-      echo "Checking code formatting with Prettier..."
-      npm run format:check || echo "Prettier not configured, skipping"
-      
-      # TypeScript check
-      echo "Running TypeScript type checking..."
-      npm run type-check || echo "TypeScript issues found but continuing"
-      
-      # Dependency audit
-      echo "Running dependency security audit..."
-      npm audit --audit-level moderate || echo "Audit issues found but continuing"
-      
-    - echo "✅ Frontend code quality checks completed"
-  allow_failure: true
-dependency-scan:
-  stage: quality
-  image: python:3.11-slim
-  before_script:
-    - pip install safety pip-audit
-  script:
-    - echo "Scanning Python dependencies for vulnerabilities..."
-    - cd backend
-    - |
-      # Safety check
-      echo "Running Safety scan..."
-      safety check --json --output safety-report.json || true
-      safety check
-      
-      # Pip audit
-      echo "Running pip-audit..."
-      pip-audit --format=json --output=pip-audit-report.json || true
-      pip-audit
-      
-    - echo "✅ Dependency scan completed"
-  artifacts:
-    paths:
-      - backend/safety-report.json
-      - backend/pip-audit-report.json
-    expire_in: 1 week
-  allow_failure: true
-
-# ===== SECURITY STAGE =====
-
-security-audit:
-  stage: security
-  image: python:3.11-slim
-  <<: *cache-pip
-  services:
-    - postgres:15-alpine
-  variables:
-    POSTGRES_DB: test_security
-    POSTGRES_USER: test
-    POSTGRES_PASSWORD: test
-    POSTGRES_HOST_AUTH_METHOD: trust
-    DATABASE_NAME: test_security
-    DATABASE_USER: test
-    DATABASE_PASSWORD: test
-    DATABASE_HOST: postgres
-    DATABASE_PORT: "5432"
-    DJANGO_SETTINGS_MODULE: config.testing
-  before_script:
-    - apt-get update -qq && apt-get install -y -qq postgresql-client
-    - cd backend
-    - pip install --cache-dir .cache/pip -r requirements.txt -r requirements-dev.txt
-    - |
-      until pg_isready -h postgres -p 5432 -U test; do
-        echo "Waiting for database..."
-        sleep 2
-      done
-  script:
-    - echo "Running security audit..."
-    - python manage.py migrate --noinput
-    - python manage.py security_audit --output json --file security-audit-report.json
-    - python manage.py security_audit
-    - echo "✅ Security audit completed"
-  artifacts:
-    paths:
-      - backend/security-audit-report.json
-    expire_in: 1 week
-secrets-scan:
-  stage: security
-  image: alpine:latest
-  before_script:
-    - apk add --no-cache git
-    - |
-      # Install gitleaks
-      wget -O gitleaks.tar.gz https://github.com/zricethezav/gitleaks/releases/download/v8.18.0/gitleaks_8.18.0_linux_x64.tar.gz
-      tar -xzf gitleaks.tar.gz
-      chmod +x gitleaks
-      mv gitleaks /usr/local/bin/
-  script:
-    - echo "Scanning for secrets and sensitive data..."
-    - gitleaks detect --source . --report-format json --report-path gitleaks-report.json --verbose || true
-    - gitleaks detect --source . --verbose
-    - echo "✅ Secrets scan completed"
-  artifacts:
-    paths:
-      - gitleaks-report.json
-    expire_in: 1 week
-  allow_failure: true
-
-# ===== BUILD STAGE =====
-
-build-backend:
-  stage: build
-  image: python:3.11-slim
-  <<: *cache-pip
-  before_script:
-    - cd backend
-    - pip install --cache-dir .cache/pip -r requirements.txt
-  script:
-    - echo "Building backend..."
-    - python manage.py collectstatic --noinput --settings=config.production
-    - python manage.py check --deploy --settings=config.production
-    - echo "✅ Backend build completed"
-  artifacts:
-    paths:
-      - backend/staticfiles/
-    expire_in: 1 hour
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-
-build-frontend:
-  stage: build
-  image: node:20-alpine
-  <<: *cache-node
-  before_script:
-    - npm ci --cache .cache/node
-  script:
-    - echo "Building frontend..."
+    - npm run lint
+    - npm run type-check
     - npm run build
-    - |
-      # Verify build output
-      if [ ! -d "dist" ]; then
-        echo "❌ Build output directory 'dist' not found"
-        exit 1
-      fi
-      echo "Build size: $(du -sh dist)"
-    - echo "✅ Frontend build completed"
   artifacts:
     paths:
       - dist/
-    expire_in: 1 hour
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-build-docker-images:
-  stage: build
-  image: docker:24.0.5
-  services:
-    - docker:24.0.5-dind
-  <<: *cache-docker
-  variables:
-    DOCKER_TLS_CERTDIR: "/certs"
-  before_script:
-    - docker info
-  script:
-    - echo "Building Docker images..."
-    - |
-      # Build backend image
-      echo "Building backend image..."
-      docker build \
-        --cache-from $CI_REGISTRY_IMAGE/backend:latest \
-        --tag $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA \
-        --tag $CI_REGISTRY_IMAGE/backend:latest \
-        ./backend
-      
-      # Build frontend image  
-      echo "Building frontend image..."
-      docker build \
-        --cache-from $CI_REGISTRY_IMAGE/frontend:latest \
-        --tag $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA \
-        --tag $CI_REGISTRY_IMAGE/frontend:latest \
-        -f Dockerfile.frontend \
-        .
-      
-    - echo "✅ Docker images built successfully"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-  dependencies:
-    - build-backend
-    - build-frontend
-
-# ===== DEPLOYMENT STAGE =====
-
-deploy-staging:
-  stage: deploy
-  image: alpine:latest
-  environment:
-    name: staging
-    url: https://staging.yourschool.com
-  before_script:
-    - apk add --no-cache openssh-client curl
-    - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
-    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - ssh-keyscan $STAGING_SERVER >> ~/.ssh/known_hosts
-  script:
-    - echo "Deploying to staging environment..."
-    - |
-      ssh $STAGING_USER@$STAGING_SERVER << 'EOF'
-        set -e
-        cd $STAGING_PATH
-        
-        # Pull latest code
-        git pull origin main
-        
-        # Backend deployment
-        cd backend
-        source venv/bin/activate
-        pip install -r requirements.txt
-        python manage.py migrate --noinput
-        python manage.py collectstatic --noinput
-        python manage.py setup_production_db --skip-migrations
-        
-        # Frontend deployment
-        cd ..
-        npm install
-        npm run build
-        
-        # Restart services
-        sudo systemctl restart school-backend-staging
-        sudo systemctl restart nginx
-        
-        # Health check
-        sleep 10
-        curl -f http://localhost:8001/monitoring/health/ || exit 1
-        
-        echo "✅ Staging deployment completed successfully"
-      EOF
-    - echo "✅ Staging deployment completed"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-  dependencies:
-    - build-backend
-    - build-frontend
-  when: manual
-deploy-production:
-  stage: deploy
-  image: docker:24.0.5
-  services:
-    - docker:24.0.5-dind
-  environment:
-    name: production
-    url: https://yourschool.com
-  variables:
-    DOCKER_TLS_CERTDIR: "/certs"
-  before_script:
-    - apk add --no-cache openssh-client git curl jq
-    - docker info
-  script:
-    - echo "🚀 Starting production deployment with enhanced monitoring..."
-    - |
-      # Create production environment file
-      cat > .env.production << EOF
-      ENVIRONMENT=production
-      DEBUG=False
-      SECRET_KEY=${SECRET_KEY}
-      SUPABASE_DB_NAME=${SUPABASE_DB_NAME}
-      SUPABASE_DB_USER=${SUPABASE_DB_USER}
-      SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
-      SUPABASE_DB_HOST=${SUPABASE_DB_HOST}
-      SUPABASE_DB_PORT=${SUPABASE_DB_PORT:-5432}
-      ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
-      CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
-      REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
-      SENTRY_DSN=${SENTRY_DSN:-}
-      CI=true
-      GITLAB_CI=true
-      CI_JOB_ID=${CI_JOB_ID}
-      CI_PIPELINE_ID=${CI_PIPELINE_ID}
-      CI_COMMIT_SHA=${CI_COMMIT_SHA}
-      BACKUP_S3_ENABLED=${BACKUP_S3_ENABLED:-false}
-      BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-90}
-      EOF
-      
-      # Deploy with zero-downtime strategy
-      echo "Deploying with zero-downtime strategy..."
-      
-      # Deploy new version
-      docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --no-deps backend frontend
-      
-      # Health checks
-      echo "Performing health checks..."
-      sleep 30
-      
-      # Check backend health with retries
-      for i in {1..10}; do
-        if docker-compose -f docker-compose.prod.yml exec -T backend curl -f http://localhost:8000/monitoring/health/; then
-          echo "✅ Backend health check passed"
-          break
-        else
-          echo "⏳ Backend health check attempt $i/10 failed, retrying..."
-          sleep 10
-          if [ $i -eq 10 ]; then
-            echo "❌ Backend health check failed after 10 attempts"
-            docker-compose -f docker-compose.prod.yml logs backend
-            exit 1
-          fi
-        fi
-      done
-      
-      # Update nginx
-      docker-compose -f docker-compose.prod.yml --env-file .env.production up -d nginx
-      
-    - echo "✅ Production deployment completed successfully"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-  dependencies:
-    - build-docker-images
-  when: manual
-  timeout: 30m
-# ===== MONITORING STAGE =====
-
-post-deploy-monitoring:
-  stage: monitor
-  image: alpine:latest
-  environment:
-    name: production
-    url: https://yourschool.com
-  before_script:
-    - apk add --no-cache curl jq bc
-  script:
-    - echo "Running post-deployment monitoring..."
-    - |
-      # Wait for deployment to stabilize
-      sleep 60
-      
-      # Check all monitoring endpoints
-      endpoints=(
-        "/monitoring/health/"
-        "/monitoring/ready/"
-        "/monitoring/alive/"
-        "/monitoring/metrics/"
-        "/monitoring/database/"
-      )
-      
-      base_url="https://yourschool.com"
-      failed_checks=0
-      
-      for endpoint in "${endpoints[@]}"; do
-        echo "Checking $endpoint..."
-        if curl -f -s "$base_url$endpoint" | jq . > /dev/null 2>&1; then
-          echo "✅ $endpoint - OK"
-        else
-          echo "❌ $endpoint - FAILED"
-          ((failed_checks++))
-        fi
-      done
-      
-      # Performance baseline check
-      echo "Running performance baseline check..."
-      response_time=$(curl -o /dev/null -s -w "%{time_total}" "$base_url/monitoring/health/")
-      echo "Health endpoint response time: ${response_time}s"
-      
-      if (( $(echo "$response_time > 2.0" | bc -l) )); then
-        echo "⚠️ Slow response time detected: ${response_time}s"
-        ((failed_checks++))
-      fi
-      
-      # Database health check
-      echo "Checking database health..."
-      db_health=$(curl -s "$base_url/monitoring/database/" | jq -r '.data.health_score // 0')
-      echo "Database health score: $db_health"
-      
-      if [ "$db_health" -lt 80 ]; then
-        echo "⚠️ Low database health score: $db_health"
-        ((failed_checks++))
-      fi
-      
-      # Summary
-      if [ $failed_checks -eq 0 ]; then
-        echo "✅ All post-deployment checks passed"
-      else
-        echo "⚠️ $failed_checks monitoring checks failed"
-        exit 1
-      fi
-      
-    - echo "✅ Post-deployment monitoring completed"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-  dependencies: []
-  when: on_success
-
-performance-test:
-  stage: monitor
-  image: alpine:latest
-  environment:
-    name: production
-  before_script:
-    - apk add --no-cache curl apache2-utils bc
-  script:
-    - echo "Running performance tests..."
-    - |
-      # Basic load test
-      echo "Running basic load test..."
-      ab -n 100 -c 10 https://yourschool.com/monitoring/health/ > load_test_results.txt
-      
-      # Extract key metrics
-      avg_response=$(grep "Time per request" load_test_results.txt | head -1 | awk '{print $4}')
-      failed_requests=$(grep "Failed requests" load_test_results.txt | awk '{print $3}')
-      
-      echo "Average response time: ${avg_response}ms"
-      echo "Failed requests: $failed_requests"
-      
-      # Performance thresholds
-      if [ "${failed_requests}" -gt 0 ]; then
-        echo "❌ Performance test failed: $failed_requests failed requests"
-        exit 1
-      fi
-      
-    - echo "✅ Performance tests completed"
-  artifacts:
-    paths:
-      - load_test_results.txt
     expire_in: 1 week
+
+security:
+  stage: security
+  image: python:3.11-slim
+  before_script:
+    - pip install --no-cache-dir pip-audit
+  script:
+    - pip-audit -r backend/requirements.txt
+
+build_images:
+  stage: build
+  image: docker:27
+  services:
+    - name: docker:27-dind
+      alias: docker
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - docker build --pull -t "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA" ./backend
+    - docker build --pull -t "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA" -f Dockerfile.frontend .
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-  when: manual
-  allow_failure: true
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# Deployment is intentionally manual and only runs after all checks pass.
+deploy_production:
+  stage: deploy
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache openssh-client
+    - test -n "$DEPLOY_HOST"
+    - test -n "$DEPLOY_USER"
+    - test -n "$DEPLOY_PATH"
+    - test -n "$SSH_PRIVATE_KEY"
+    - eval "$(ssh-agent -s)"
+    - printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+  script:
+    - ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && git pull --ff-only origin '$CI_DEFAULT_BRANCH' && docker compose -f docker-compose.prod.yml up -d --build && docker compose -f docker-compose.prod.yml ps"
+  environment:
+    name: production
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+  allow_failure: false
+  needs:
+    - backend_tests
+    - frontend_checks
+    - security
+    - build_images

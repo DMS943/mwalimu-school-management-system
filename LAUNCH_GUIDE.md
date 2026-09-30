@@ -1,336 +1,166 @@
-# 🚀 LAUNCH GUIDE - Mwalimu School Management System
+# 🚀 Mwalimu School Management System - Launch Guide
 
-## 🎉 READY FOR PRODUCTION LAUNCH!
+## 🎯 **Quick Start: Run the Project**
 
-Your Mwalimu School Management System has been successfully transformed into a **fully production-ready, enterprise-grade application**. This guide will help you launch it successfully.
+### **Option 1: Development Mode (Recommended for Testing)**
 
-## 🔥 Quick Launch Options
+1. **Backend (Django API)**
+   ```bash
+   cd backend
+   pip install Django djangorestframework django-cors-headers python-decouple
+   python manage.py migrate --settings=config.minimal
+   python manage.py runserver 8000 --settings=config.minimal
+   ```
+   Backend will be running at: `http://localhost:8000`
 
-### Option 1: Docker Compose (Recommended for Single Server)
+2. **Frontend (React + Vite)**
+   ```bash
+   # Install dependencies (this might take a few minutes)
+   npm install
+   
+   # Start development server
+   npm run dev
+   ```
+   Frontend will be running at: `http://localhost:5173`
+
+### **Option 2: Production Mode (Docker)**
+
 ```bash
-# 1. Clone and enter directory
-git clone <your-repo-url>
-cd mwalimu-school-management-system
-
-# 2. Configure production environment
-cp .env.example.production .env.production
-# Edit .env.production with your actual values
-
-# 3. Launch production stack
+# Build and run with Docker Compose
 docker-compose -f docker-compose.prod.yml up -d
 
-# 4. Initialize database
-docker-compose -f docker-compose.prod.yml exec app python manage.py migrate
-docker-compose -f docker-compose.prod.yml exec app python manage.py createsuperuser
-
-# 5. Collect static files
-docker-compose -f docker-compose.prod.yml exec app python manage.py collectstatic --noinput
-
-# 6. Warm caches
-docker-compose -f docker-compose.prod.yml exec app python manage.py optimize_performance cache --warm
-
-# 🎉 Your system is now live at https://yourschool.com!
+# Access the application
+# Frontend: http://localhost
+# Backend API: http://localhost/api
 ```
 
-### Option 2: Kubernetes (Enterprise Scaling)
+### **Option 3: Simple Demo (If Dependencies Fail)**
+
+For a quick demonstration without complex setup:
+
 ```bash
-# 1. Configure Kubernetes secrets
-kubectl create namespace mwalimu-prod
-kubectl create secret generic mwalimu-secrets --from-env-file=.env.production -n mwalimu-prod
+# Create a simple Django demo
+django-admin startproject school_demo
+cd school_demo
+python manage.py runserver
+```
+Visit: `http://localhost:8000`
 
-# 2. Deploy all components
-kubectl apply -f k8s/ -n mwalimu-prod
+## 🌟 **What You'll See**
 
-# 3. Wait for deployment
-kubectl rollout status deployment/mwalimu-backend -n mwalimu-prod
+### **🎓 Frontend Features**
+- **Modern React Dashboard** with school management interface
+- **Student Management** - Add, edit, view student profiles
+- **Class Management** - Organize students into classes
+- **Academic Records** - Track grades and attendance
+- **Reports Dashboard** - Generate academic reports
+- **Responsive Design** - Works on desktop and mobile
 
-# 4. Initialize database
-kubectl exec -it deployment/mwalimu-backend -n mwalimu-prod -- python manage.py migrate
-kubectl exec -it deployment/mwalimu-backend -n mwalimu-prod -- python manage.py createsuperuser
+### **⚙️ Backend Features**
+- **REST API** endpoints for all school operations
+- **JWT Authentication** for secure access
+- **Django Admin Panel** for administrative tasks
+- **Database Integration** with proper relationships
+- **API Documentation** with automatic schema generation
 
-# 🎉 Your system is now running on Kubernetes!
+## 🔧 **Development URLs**
+
+When running in development mode:
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Frontend** | `http://localhost:5173` | React application |
+| **Backend API** | `http://localhost:8000/api/` | REST API endpoints |
+| **Django Admin** | `http://localhost:8000/admin/` | Admin interface |
+| **API Docs** | `http://localhost:8000/api/docs/` | API documentation |
+
+## 📁 **Project Structure**
+
+```
+mwalimu-school-management-system/
+├── backend/                 # Django REST API
+│   ├── apps/               # Django applications
+│   │   ├── users/         # User management
+│   │   ├── students/      # Student profiles
+│   │   ├── schools/       # School settings
+│   │   ├── academics/     # Academic records
+│   │   └── reports/       # Reports generation
+│   ├── config/            # Django settings
+│   └── manage.py          # Django management
+├── src/                    # React frontend
+│   ├── components/        # Reusable components
+│   ├── pages/            # Application pages
+│   ├── hooks/            # Custom React hooks
+│   └── lib/              # Utility functions
+├── docs/                  # Documentation
+├── docker-compose.prod.yml # Production deployment
+└── package.json           # Frontend dependencies
 ```
 
-## 📋 Essential Configuration
+## 🎉 **Features Demonstrated**
 
-### 1. Environment Variables (CRITICAL - Configure These First!)
-```bash
-# Copy and edit production environment
-cp .env.example.production .env.production
-```
+### **✅ School Management**
+- Create and manage school profiles
+- Configure academic terms and sessions
+- Set up school-specific settings
 
-**Required Configuration:**
-```env
-# Core Settings
-ENVIRONMENT=production
-DEBUG=False
-SECRET_KEY=<generate-64-character-secret-key>
+### **✅ Student Information System**
+- Student enrollment and profiles
+- Parent/guardian information
+- Academic history tracking
 
-# Database (Use your actual database)
-DATABASE_URL=postgresql://user:password@host:5432/mwalimu_prod
-DATABASE_HOST=your-db-host.com
-DATABASE_NAME=mwalimu_production
-DATABASE_USER=mwalimu_user
-DATABASE_PASSWORD=your-secure-password
+### **✅ Academic Management**
+- Class and subject management
+- Grade and examination records
+- Attendance tracking
 
-# Domain Configuration
-ALLOWED_HOSTS=yourschool.com,www.yourschool.com,api.yourschool.com
-CORS_ALLOWED_ORIGINS=https://yourschool.com,https://www.yourschool.com
+### **✅ Reports & Analytics**
+- Student performance reports
+- Attendance summaries
+- Academic progress tracking
+- Export capabilities (PDF, Excel)
 
-# Redis Cache
-REDIS_URL=redis://your-redis-host:6379/0
+### **✅ User Management**
+- Role-based access (Admin, Teacher, Parent)
+- Secure authentication with JWT
+- User permissions and authorization
 
-# Email Service
-EMAIL_HOST=smtp.yourprovider.com
-EMAIL_HOST_USER=noreply@yourschool.com
-EMAIL_HOST_PASSWORD=your-email-password
-DEFAULT_FROM_EMAIL=noreply@yourschool.com
+## 🛠️ **Troubleshooting**
 
-# SSL Security
-SECURE_SSL_REDIRECT=True
-SECURE_HSTS_SECONDS=31536000
-```
+### **Common Issues & Solutions:**
 
-### 2. Generate Secret Key
-```bash
-# Use the included utility
-cd backend
-python generate_secret_key.py
+1. **Dependencies Installation Slow**
+   - Use `npm ci` instead of `npm install`
+   - Clear npm cache: `npm cache clean --force`
 
-# Copy the generated key to your .env.production file
-```
+2. **Backend Import Errors**
+   - Install missing packages: `pip install <package_name>`
+   - Use the minimal settings: `--settings=config.minimal`
 
-### 3. SSL Certificate Setup
-```bash
-# Automatic SSL with Let's Encrypt (included in nginx config)
-./nginx/ssl/setup-ssl.sh --domain yourschool.com --email admin@yourschool.com
-```
+3. **Port Already in Use**
+   - Change backend port: `python manage.py runserver 8001`
+   - Change frontend port: `npm run dev -- --port 5174`
 
-## 🏗️ Infrastructure Setup
+4. **Database Issues**
+   - Reset database: `rm backend/db.sqlite3`
+   - Run migrations: `python manage.py migrate`
 
-### Minimum Server Requirements
-- **CPU**: 4 cores (8 recommended)
-- **RAM**: 8GB (16GB recommended)
-- **Storage**: 100GB SSD (500GB recommended)
-- **Network**: 100 Mbps (1 Gbps recommended)
+## 🌐 **Production Deployment**
 
-### Cloud Provider Quick Setup
+For production deployment, see:
+- **[PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md)** - Complete production setup
+- **[DOCKER_GUIDE.md](docs/DOCKER_GUIDE.md)** - Containerization guide
+- **[SECURITY.md](docs/SECURITY.md)** - Security considerations
 
-#### AWS
-```bash
-# Launch EC2 instance (t3.large or larger)
-# Configure Security Groups: 80, 443, 22
-# Attach Elastic IP
-# Configure RDS PostgreSQL instance
-# Setup ElastiCache Redis cluster
-```
+## 📞 **Support & Documentation**
 
-#### Google Cloud
-```bash
-# Launch Compute Engine instance (n1-standard-2 or larger)
-# Configure firewall rules
-# Setup Cloud SQL PostgreSQL
-# Setup Memorystore Redis
-```
-
-#### DigitalOcean
-```bash
-# Launch Droplet (4GB or larger)
-# Setup Managed PostgreSQL
-# Setup Managed Redis
-# Configure Load Balancer
-```
-
-## 🔐 Security Setup
-
-### 1. Firewall Configuration
-```bash
-# Allow only necessary ports
-ufw allow 22/tcp   # SSH
-ufw allow 80/tcp   # HTTP (redirects to HTTPS)
-ufw allow 443/tcp  # HTTPS
-ufw enable
-```
-
-### 2. Initial Security Hardening
-```bash
-# Run security audit
-docker-compose -f docker-compose.prod.yml exec app python manage.py security_audit --setup-production
-
-# Configure fail2ban (optional but recommended)
-sudo apt install fail2ban
-sudo systemctl enable fail2ban
-```
-
-## 📊 Monitoring Setup
-
-### 1. Access Monitoring Dashboards
-- **Application Performance**: https://yourschool.com/admin/performance/
-- **System Monitoring**: https://monitoring.yourschool.com/grafana (if configured)
-- **Health Checks**: https://yourschool.com/monitoring/health/
-
-### 2. Configure Alerts
-```bash
-# Setup email alerts
-docker-compose -f docker-compose.prod.yml exec app python manage.py monitor_health --setup-alerts
-
-# Test alert system
-docker-compose -f docker-compose.prod.yml exec app python manage.py monitor_health --test-alerts
-```
-
-## 🔄 Initial Data Setup
-
-### 1. Create School Configuration
-```bash
-# Access Django admin at https://yourschool.com/admin/
-# Login with your superuser account
-# Navigate to Schools > School Settings
-# Configure your school information
-```
-
-### 2. Setup User Roles and Permissions
-```bash
-# Create user groups via admin interface
-# Configure role-based permissions
-# Create initial teacher and staff accounts
-```
-
-### 3. Configure Academic Settings
-```bash
-# Setup academic years, terms, subjects
-# Configure grading system
-# Setup class structures
-```
-
-## 🎯 Go-Live Checklist
-
-### Pre-Launch Tests (Run These Before Going Live)
-```bash
-# 1. Health check
-curl -f https://yourschool.com/monitoring/health/
-
-# 2. Performance test
-docker-compose -f docker-compose.prod.yml exec app python manage.py optimize_performance monitor --report
-
-# 3. Security scan
-docker-compose -f docker-compose.prod.yml exec app python manage.py security_audit --full-scan
-
-# 4. Backup test
-docker-compose -f docker-compose.prod.yml exec app python manage.py disaster_recovery backup --tier local --full
-
-# 5. Database integrity
-docker-compose -f docker-compose.prod.yml exec app python manage.py check --database default
-```
-
-### ✅ Final Go-Live Checklist
-- [ ] **Domain & SSL**: Domain points to server, SSL certificate valid
-- [ ] **Application**: All services running, health checks passing
-- [ ] **Database**: Migrations applied, superuser created
-- [ ] **Security**: Firewall configured, security audit passed
-- [ ] **Monitoring**: Dashboards accessible, alerts configured
-- [ ] **Backups**: Initial backup created and verified
-- [ ] **Performance**: Cache warmed, optimization applied
-- [ ] **Documentation**: Team has access to operational guides
-
-## 🌐 Post-Launch Activities
-
-### Immediate (First Hour)
-```bash
-# Monitor system health
-watch curl -s https://yourschool.com/monitoring/health/
-
-# Check logs for any issues
-docker-compose -f docker-compose.prod.yml logs -f
-
-# Verify all services
-docker-compose -f docker-compose.prod.yml ps
-```
-
-### First Day
-- [ ] Monitor user registration and login flows
-- [ ] Verify email delivery working
-- [ ] Check performance metrics
-- [ ] Test backup procedures
-- [ ] Gather initial user feedback
-
-### First Week
-- [ ] Review performance trends
-- [ ] Optimize based on usage patterns
-- [ ] Fine-tune alert thresholds
-- [ ] Plan capacity scaling if needed
-- [ ] Conduct security review
-
-## 📞 Support and Maintenance
-
-### Daily Automated Tasks
-✅ **Health Checks**: Every 15 minutes  
-✅ **Backup Verification**: Daily at 6 AM UTC  
-✅ **Log Rotation**: Daily at 3 AM UTC  
-✅ **Cache Optimization**: Daily at 4 AM UTC  
-
-### Weekly Maintenance Window
-📅 **Schedule**: Sundays 2:00 AM - 4:00 AM UTC  
-🔧 **Tasks**: System updates, database maintenance, security patches  
-
-### Emergency Support
-🚨 **Critical Issues**: < 15 minutes response time  
-⚠️ **High Priority**: < 1 hour response time  
-📞 **Emergency Contact**: [Configure your emergency contacts]  
-
-## 🎉 Congratulations!
-
-Your **Mwalimu School Management System** is now live and serving your educational institution with:
-
-### ✅ Enterprise Features Activated
-🔒 **Bank-Grade Security**: Multi-layer protection, compliance ready  
-⚡ **High Performance**: 65-85% faster than baseline, optimized caching  
-🌍 **Global Scale**: CDN integration, multi-region backup  
-📊 **Real-Time Monitoring**: 99.9% uptime tracking, automated alerts  
-🔄 **Disaster Recovery**: 15-min RTO, automated failover  
-📚 **Complete Documentation**: Operational runbooks, troubleshooting guides  
-
-### 🚀 Ready to Serve
-- **300+ Concurrent Users**: Tested and verified
-- **Auto-Scaling**: Grows with your institution
-- **24/7 Monitoring**: Proactive issue detection
-- **Regulatory Compliance**: GDPR, FERPA, SOX ready
-- **Multi-Language Ready**: Internationalization support
-
-## 📚 Quick Reference
-
-### Essential Commands
-```bash
-# Health check
-curl https://yourschool.com/monitoring/health/
-
-# Performance report
-docker-compose -f docker-compose.prod.yml exec app python manage.py optimize_performance monitor --report
-
-# Create backup
-docker-compose -f docker-compose.prod.yml exec app python manage.py disaster_recovery backup --tier offsite --full
-
-# Security audit
-docker-compose -f docker-compose.prod.yml exec app python manage.py security_audit --quick-check
-```
-
-### Important URLs
-- **Main Application**: https://yourschool.com/
-- **Admin Interface**: https://yourschool.com/admin/
-- **API Documentation**: https://yourschool.com/api/
-- **Health Check**: https://yourschool.com/monitoring/health/
-- **Performance Dashboard**: https://yourschool.com/admin/performance/
+- **API Documentation**: Available at `/api/docs/` when backend is running
+- **Component Library**: React components in `/src/components/`
+- **Database Schema**: Django models in `/backend/apps/*/models.py`
+- **Configuration**: Settings in `/backend/config/`
 
 ---
 
-## 🎊 LAUNCH SUCCESS!
+**🎓 Ready to manage your school digitally!** 
 
-**Your Mwalimu School Management System is now LIVE and ready to transform education at your institution!**
-
-**Welcome to the future of school management!** 🎓✨
-
----
-
-**Launch Date**: December 2024  
-**System Status**: 🟢 LIVE & OPERATIONAL  
-**Next Steps**: Monitor performance and gather user feedback  
-**Support**: Refer to `docs/` directory for operational guides
+The Mwalimu School Management System provides a complete solution for educational institutions to manage students, academics, and administrative tasks efficiently.
